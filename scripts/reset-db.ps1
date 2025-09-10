@@ -1,23 +1,11 @@
-param(
-  [switch]$RebuildApi = $false
-)
+# Löscht alle Objekte per drop_all.sql, nutzt Container-ENVs
+Write-Host "⏳ Dropping all DB objects (using container env)..."
 
-Write-Host "ACHTUNG: Löscht das DB-Volume (alle Daten weg)!" -ForegroundColor Yellow
-$confirm = Read-Host "Fortfahren? (ja/nein)"
-if ($confirm -ne "ja") { exit 0 }
-
-# Nur DB-Container + Volume löschen
-docker compose stop db
-# ganzes Compose runter + Volumes löschen (einfachster sicherer Weg)
-docker compose down -v
-
-# neu starten
-if ($RebuildApi) {
-  docker compose up -d --build
+# Nutze die im Container vorhandenen Variablen aus .env
+docker compose exec -T db sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /db/drop_all.sql'
+if ($LASTEXITCODE -eq 0) {
+  Write-Host "✅ drop_all.sql erfolgreich ausgeführt."
 } else {
-  docker compose up -d
+  Write-Host "❌ Fehler beim Ausführen von drop_all.sql."
+  exit $LASTEXITCODE
 }
-
-# Warten bis DB gesund ist
-Write-Host "Warte auf DB Healthcheck..."
-docker compose ps
