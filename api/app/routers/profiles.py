@@ -1,0 +1,42 @@
+from typing import Optional, Any, List
+from fastapi import APIRouter
+from ..db import get_connection
+from ..schemas import ProfileCreate
+
+router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+@router.get("")
+def list_profiles(platform_id: Optional[int] = None, username: Optional[str] = None, limit: int = 50, offset: int = 0):
+    sql = "SELECT * FROM profiles WHERE 1=1"
+    params: List[Any] = []
+    if platform_id:
+        sql += " AND platform_id=%s"
+        params.append(platform_id)
+    if username:
+        sql += " AND username ILIKE %s"
+        params.append(f"%{username}%")
+    sql += " ORDER BY id LIMIT %s OFFSET %s"
+    params += [limit, offset]
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return {"items": rows, "limit": limit, "offset": offset}
+
+@router.post("", status_code=201)
+def create_profile(payload: ProfileCreate):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO profiles (
+                platform_id, username, external_id, display_name, url, status,
+                language, region, is_verified, avatar_url, bio, metadata
+            ) VALUES (
+                %(platform_id)s, %(username)s, %(external_id)s, %(display_name)s, %(url)s, %(status)s,
+                %(language)s, %(region)s, %(is_verified)s, %(avatar_url)s, %(bio)s, %(metadata)s
+            ) RETURNING *;
+            """,
+            payload.model_dump(),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    return row
