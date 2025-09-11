@@ -40,9 +40,8 @@ services:
       dockerfile: api/Dockerfile
     container_name: api_app
     restart: unless-stopped
-    env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://appuser:apppassword@db:5432/appdb
     ports:
       - "${API_PORT}:8000"
     depends_on:
