@@ -1,5 +1,5 @@
 -- ================================
--- 1-init_extended.sql — Core Schema (erweitert)
+-- 1-init_extended.sql — Core Schema 
 -- ================================
 
 -- Optional, NUR DEV:

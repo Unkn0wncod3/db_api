@@ -30,7 +30,6 @@ def delete_note(note_id: int):
         raise HTTPException(404, "Note not found")
     return {"deleted": row["id"]}
 
-# Notes unter Person
 @router.get("/by-person/{person_id}")
 def list_person_notes(person_id: int):
     with get_connection() as conn, conn.cursor() as cur:

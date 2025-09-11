@@ -1,13 +1,13 @@
--- 0-drop_all.sql — vorhandene Views, Tabellen, Trigger, Funktionen entfernen
+-- Remove all database objects in the correct order to avoid dependency issues
 
 BEGIN;
 
--- 1) Views zuerst
+-- 1) Views 
 DROP VIEW IF EXISTS v_person_timeline      CASCADE;
 DROP VIEW IF EXISTS v_person_profiles      CASCADE;
 DROP VIEW IF EXISTS v_person_summary       CASCADE;
 
--- 2) Tabellen (Reihenfolge beachtet; CASCADE tut's sonst auch)
+-- 2) Tables
 DROP TABLE IF EXISTS community_memberships CASCADE;
 DROP TABLE IF EXISTS game_profiles         CASCADE;
 DROP TABLE IF EXISTS usages                CASCADE;
@@ -21,7 +21,7 @@ DROP TABLE IF EXISTS profiles              CASCADE;
 DROP TABLE IF EXISTS platforms             CASCADE;
 DROP TABLE IF EXISTS persons               CASCADE;
 
--- 3) Trigger-Funktion(en)
+-- 3) Trigger
 DROP FUNCTION IF EXISTS set_updated_at()   CASCADE;
 
 COMMIT;

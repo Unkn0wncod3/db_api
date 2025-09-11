@@ -9,7 +9,7 @@ router = APIRouter(prefix="/activities", tags=["activities"])
 def list_activities(
     person_id: Optional[int] = None,
     activity_type: Optional[str] = None,
-    since: Optional[str] = None,   # ISO-String; DB macht TIMESTAMPTZ cast
+    since: Optional[str] = None,   # ISO-String; DB TIMESTAMPTZ cast
     limit: int = 100,
     offset: int = 0,
 ):

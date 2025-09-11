@@ -5,14 +5,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Virtualenv im Image
-ENV VENV_PATH=/opt/venv
-RUN python -m venv $VENV_PATH
-ENV PATH="$VENV_PATH/bin:$PATH"
-
 WORKDIR /app
 
-# Dependencies zuerst (Schicht-Caching)
+# Dependencies first
 COPY api/requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip && pip install -r requirements.txt
 

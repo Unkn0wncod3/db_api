@@ -13,8 +13,7 @@ def show(r):
 
 if __name__ == "__main__":
     show(requests.get(f"{BASE}/"))
-    #show(requests.get(f"{BASE}/__routes"))
-
+    show(requests.get(f"{BASE}/__routes"))
     show(requests.get(f"{BASE}/persons"))
     show(requests.get(f"{BASE}/persons/1"))
     show(requests.get(f"{BASE}/notes"))

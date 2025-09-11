@@ -4,7 +4,6 @@ from .routers import persons, notes, platforms, profiles, person_links, vehicles
 
 app = FastAPI(title="DB Manager API")
 
-# Router registrieren
 app.include_router(persons.router)
 app.include_router(notes.router)
 app.include_router(platforms.router)
