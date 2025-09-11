@@ -18,3 +18,8 @@ if __name__ == "__main__":
     show(requests.get(f"{BASE}/persons"))
     show(requests.get(f"{BASE}/persons/1"))
     show(requests.get(f"{BASE}/notes"))
+    show(requests.get(f"{BASE}/profiles"))
+    show(requests.get(f"{BASE}/activities"))
+    show(requests.get(f"{BASE}/platforms"))
+    show(requests.get(f"{BASE}/persons/1/profiles"))
+    show(requests.get(f"{BASE}/vehicles"))
