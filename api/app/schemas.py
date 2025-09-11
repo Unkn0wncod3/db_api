@@ -20,9 +20,9 @@ class PersonCreate(BaseModel):
     nationality: Optional[str] = None
     occupation: Optional[str] = None
     risk_level: Optional[str] = None
-    tags: Optional[List[str]] = []
+    tags: Optional[List[str]] = Field(default_factory=list)
     notes: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 class PersonUpdate(BaseModel):
     first_name: Optional[str] = None
@@ -73,7 +73,7 @@ class ProfileCreate(BaseModel):
     is_verified: bool = False
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 # -------- Person ↔ Profile --------
 class LinkProfilePayload(BaseModel):
@@ -93,7 +93,7 @@ class VehicleCreate(BaseModel):
     color: Optional[str] = None
     mileage_km: Optional[int] = None
     last_service_at: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 # -------- Activities --------
 class ActivityCreate(BaseModel):
@@ -105,7 +105,7 @@ class ActivityCreate(BaseModel):
     community_id: Optional[int] = None
     item: Optional[str] = None
     notes: Optional[str] = None
-    details: Optional[Dict[str, Any]] = {}
+    details: Optional[Dict[str, Any]] = Field(default_factory=dict)
     severity: Optional[str] = None
     source: Optional[str] = None
     ip_address: Optional[str] = None
