@@ -1,5 +1,5 @@
 
-# DB Manager
+# DB API
 
 ### Preparations
 pip install -r requirements.txt
