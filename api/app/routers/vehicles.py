@@ -1,6 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from ..db import get_connection
-from ..schemas import VehicleCreate
+from ..schemas import VehicleCreate, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
@@ -29,3 +29,31 @@ def create_vehicle(payload: VehicleCreate):
         row = cur.fetchone()
         conn.commit()
     return row
+
+@router.patch("/{vehicle_id}")
+def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
+    fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    if not fields:
+        raise HTTPException(400, "No fields to update")
+    set_sql = ", ".join([f"{column}=%({column})s" for column in fields])
+    fields["vehicle_id"] = vehicle_id
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE vehicles SET {set_sql} WHERE id=%(vehicle_id)s RETURNING *;",
+            fields,
+        )
+        row = cur.fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(404, "Vehicle not found")
+    return row
+
+@router.delete("/{vehicle_id}")
+def delete_vehicle(vehicle_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM vehicles WHERE id=%s RETURNING id;", (vehicle_id,))
+        row = cur.fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(404, "Vehicle not found")
+    return {"deleted": row["id"]}

@@ -1,7 +1,7 @@
 from typing import Optional, Any, List
 from fastapi import APIRouter, HTTPException
 from ..db import get_connection
-from ..schemas import ActivityCreate
+from ..schemas import ActivityCreate, ActivityUpdate
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/activities", tags=["activities"])
 def list_activities(
     person_id: Optional[int] = None,
     activity_type: Optional[str] = None,
-    since: Optional[str] = None,   # ISO-String; DB TIMESTAMPTZ cast
+    since: Optional[str] = None,  # ISO-String; DB TIMESTAMPTZ cast
     limit: int = 100,
     offset: int = 0,
 ):
@@ -52,3 +52,31 @@ def create_activity(payload: ActivityCreate):
         row = cur.fetchone()
         conn.commit()
     return row
+
+@router.patch("/{activity_id}")
+def update_activity(activity_id: int, payload: ActivityUpdate):
+    fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    if not fields:
+        raise HTTPException(400, "No fields to update")
+    set_sql = ", ".join([f"{column}=%({column})s" for column in fields])
+    fields["activity_id"] = activity_id
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE activities SET {set_sql} WHERE id=%(activity_id)s RETURNING *;",
+            fields,
+        )
+        row = cur.fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(404, "Activity not found")
+    return row
+
+@router.delete("/{activity_id}")
+def delete_activity(activity_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM activities WHERE id=%s RETURNING id;", (activity_id,))
+        row = cur.fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(404, "Activity not found")
+    return {"deleted": row["id"]}

@@ -1,12 +1,17 @@
 from typing import Optional, Any, List
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from ..db import get_connection
-from ..schemas import ProfileCreate
+from ..schemas import ProfileCreate, ProfileUpdate
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 @router.get("")
-def list_profiles(platform_id: Optional[int] = None, username: Optional[str] = None, limit: int = 50, offset: int = 0):
+def list_profiles(
+    platform_id: Optional[int] = None,
+    username: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
     sql = "SELECT * FROM profiles WHERE 1=1"
     params: List[Any] = []
     if platform_id:
@@ -40,3 +45,31 @@ def create_profile(payload: ProfileCreate):
         row = cur.fetchone()
         conn.commit()
     return row
+
+@router.patch("/{profile_id}")
+def update_profile(profile_id: int, payload: ProfileUpdate):
+    fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    if not fields:
+        raise HTTPException(400, "No fields to update")
+    set_sql = ", ".join([f"{column}=%({column})s" for column in fields.keys()])
+    fields["profile_id"] = profile_id
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE profiles SET {set_sql} WHERE id=%(profile_id)s RETURNING *;",
+            fields,
+        )
+        row = cur.fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    return row
+
+@router.delete("/{profile_id}")
+def delete_profile(profile_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM profiles WHERE id=%s RETURNING id;", (profile_id,))
+        row = cur.fetchone()
+        conn.commit()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    return {"deleted": row["id"]}

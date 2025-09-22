@@ -52,6 +52,11 @@ class NoteCreate(BaseModel):
     text: str
     pinned: bool = False
 
+class NoteUpdate(BaseModel):
+    title: Optional[str] = None
+    text: Optional[str] = None
+    pinned: Optional[bool] = None
+
 # -------- Platforms --------
 class PlatformCreate(BaseModel):
     name: str
@@ -59,6 +64,13 @@ class PlatformCreate(BaseModel):
     base_url: Optional[str] = None
     api_base_url: Optional[str] = None
     is_active: bool = True
+
+class PlatformUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    base_url: Optional[str] = None
+    api_base_url: Optional[str] = None
+    is_active: Optional[bool] = None
 
 # -------- Profiles --------
 class ProfileCreate(BaseModel):
@@ -74,6 +86,20 @@ class ProfileCreate(BaseModel):
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+class ProfileUpdate(BaseModel):
+    platform_id: Optional[int] = None
+    username: Optional[str] = None
+    external_id: Optional[str] = None
+    display_name: Optional[str] = None
+    url: Optional[str] = None
+    status: Optional[str] = None
+    language: Optional[str] = None
+    region: Optional[str] = None
+    is_verified: Optional[bool] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 # -------- Person ↔ Profile --------
 class LinkProfilePayload(BaseModel):
@@ -95,6 +121,20 @@ class VehicleCreate(BaseModel):
     last_service_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
+class VehicleUpdate(BaseModel):
+    label: Optional[str] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    build_year: Optional[int] = None
+    license_plate: Optional[str] = None
+    vin: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    energy_type: Optional[str] = None
+    color: Optional[str] = None
+    mileage_km: Optional[int] = None
+    last_service_at: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
+
 # -------- Activities --------
 class ActivityCreate(BaseModel):
     person_id: int
@@ -106,6 +146,23 @@ class ActivityCreate(BaseModel):
     item: Optional[str] = None
     notes: Optional[str] = None
     details: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    severity: Optional[str] = None
+    source: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    geo_location: Optional[str] = None
+    created_by: Optional[str] = None
+
+class ActivityUpdate(BaseModel):
+    person_id: Optional[int] = None
+    activity_type: Optional[str] = None
+    occurred_at: Optional[datetime] = None
+    vehicle_id: Optional[int] = None
+    profile_id: Optional[int] = None
+    community_id: Optional[int] = None
+    item: Optional[str] = None
+    notes: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
     severity: Optional[str] = None
     source: Optional[str] = None
     ip_address: Optional[str] = None

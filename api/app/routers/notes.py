@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from ..db import get_connection
-from ..schemas import NoteCreate
+from ..schemas import NoteCreate, NoteUpdate
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -16,6 +16,24 @@ def get_note(note_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("SELECT * FROM notes WHERE id=%s;", (note_id,))
         row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Note not found")
+    return row
+
+@router.patch("/{note_id}")
+def update_note(note_id: int, payload: NoteUpdate):
+    fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    if not fields:
+        raise HTTPException(400, "No fields to update")
+    set_sql = ", ".join([f"{column}=%({column})s" for column in fields])
+    fields["note_id"] = note_id
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE notes SET {set_sql} WHERE id=%(note_id)s RETURNING *;",
+            fields,
+        )
+        row = cur.fetchone()
+        conn.commit()
     if not row:
         raise HTTPException(404, "Note not found")
     return row
