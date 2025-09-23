@@ -1,9 +1,13 @@
 from typing import Optional, Any, List
+
 from fastapi import APIRouter, HTTPException
+from psycopg.types.json import Jsonb
+
 from ..db import get_connection
 from ..schemas import ProfileCreate, ProfileUpdate
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+
 
 @router.get("")
 def list_profiles(
@@ -27,8 +31,13 @@ def list_profiles(
         rows = cur.fetchall()
     return {"items": rows, "limit": limit, "offset": offset}
 
+
 @router.post("", status_code=201)
 def create_profile(payload: ProfileCreate):
+    data = payload.model_dump()
+    if data.get("metadata") is not None:
+        data["metadata"] = Jsonb(data["metadata"])
+
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -40,17 +49,22 @@ def create_profile(payload: ProfileCreate):
                 %(language)s, %(region)s, %(is_verified)s, %(avatar_url)s, %(bio)s, %(metadata)s
             ) RETURNING *;
             """,
-            payload.model_dump(),
+            data,
         )
         row = cur.fetchone()
         conn.commit()
     return row
+
 
 @router.patch("/{profile_id}")
 def update_profile(profile_id: int, payload: ProfileUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
+
+    if fields.get("metadata") is not None:
+        fields["metadata"] = Jsonb(fields["metadata"])
+
     set_sql = ", ".join([f"{column}=%({column})s" for column in fields.keys()])
     fields["profile_id"] = profile_id
     with get_connection() as conn, conn.cursor() as cur:
@@ -63,6 +77,7 @@ def update_profile(profile_id: int, payload: ProfileUpdate):
     if not row:
         raise HTTPException(404, "Profile not found")
     return row
+
 
 @router.delete("/{profile_id}")
 def delete_profile(profile_id: int):

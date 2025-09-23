@@ -1,9 +1,13 @@
 from typing import Optional, Any, List
+
 from fastapi import APIRouter, HTTPException, Query
+from psycopg.types.json import Jsonb
+
 from ..db import get_connection
 from ..schemas import PersonCreate, PersonUpdate
 
 router = APIRouter(prefix="/persons", tags=["persons"])
+
 
 @router.get("")
 def list_persons(
@@ -32,6 +36,7 @@ def list_persons(
         rows = cur.fetchall()
     return {"items": rows, "limit": limit, "offset": offset}
 
+
 @router.get("/{person_id}")
 def get_person(person_id: int):
     with get_connection() as conn, conn.cursor() as cur:
@@ -41,9 +46,14 @@ def get_person(person_id: int):
         raise HTTPException(404, "Person not found")
     return row
 
+
 @router.post("", status_code=201)
 def create_person(payload: PersonCreate):
     with get_connection() as conn, conn.cursor() as cur:
+        data = payload.model_dump()
+        if data.get("metadata") is not None:
+            data["metadata"] = Jsonb(data["metadata"])
+
         cur.execute(
             """
             INSERT INTO persons (
@@ -56,17 +66,22 @@ def create_person(payload: PersonCreate):
                 %(status)s,%(nationality)s,%(occupation)s,%(risk_level)s,%(tags)s,%(notes)s,%(metadata)s
             ) RETURNING *;
             """,
-            payload.model_dump(),
+            data,
         )
         row = cur.fetchone()
         conn.commit()
     return row
+
 
 @router.patch("/{person_id}")
 def update_person(person_id: int, payload: PersonUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
+
+    if fields.get("metadata") is not None:
+        fields["metadata"] = Jsonb(fields["metadata"])
+
     set_sql = ", ".join([f"{k}=%({k})s" for k in fields.keys()])
     fields["person_id"] = person_id
     with get_connection() as conn, conn.cursor() as cur:
@@ -76,6 +91,7 @@ def update_person(person_id: int, payload: PersonUpdate):
     if not row:
         raise HTTPException(404, "Person not found")
     return row
+
 
 @router.delete("/{person_id}")
 def delete_person(person_id: int):

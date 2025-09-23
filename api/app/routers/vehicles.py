@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException
+from psycopg.types.json import Jsonb
+
 from ..db import get_connection
 from ..schemas import VehicleCreate, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
+
 
 @router.get("")
 def list_vehicles():
@@ -11,8 +14,13 @@ def list_vehicles():
         rows = cur.fetchall()
     return {"items": rows}
 
+
 @router.post("", status_code=201)
 def create_vehicle(payload: VehicleCreate):
+    data = payload.model_dump()
+    if data.get("metadata") is not None:
+        data["metadata"] = Jsonb(data["metadata"])
+
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -24,17 +32,22 @@ def create_vehicle(payload: VehicleCreate):
                 %(energy_type)s,%(color)s,%(mileage_km)s,%(last_service_at)s,%(metadata)s
             ) RETURNING *;
             """,
-            payload.model_dump(),
+            data,
         )
         row = cur.fetchone()
         conn.commit()
     return row
+
 
 @router.patch("/{vehicle_id}")
 def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
+
+    if fields.get("metadata") is not None:
+        fields["metadata"] = Jsonb(fields["metadata"])
+
     set_sql = ", ".join([f"{column}=%({column})s" for column in fields])
     fields["vehicle_id"] = vehicle_id
     with get_connection() as conn, conn.cursor() as cur:
@@ -47,6 +60,7 @@ def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
     if not row:
         raise HTTPException(404, "Vehicle not found")
     return row
+
 
 @router.delete("/{vehicle_id}")
 def delete_vehicle(vehicle_id: int):

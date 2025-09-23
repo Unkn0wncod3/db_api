@@ -1,9 +1,13 @@
 from typing import Optional, Any, List
+
 from fastapi import APIRouter, HTTPException
+from psycopg.types.json import Jsonb
+
 from ..db import get_connection
 from ..schemas import ActivityCreate, ActivityUpdate
 
 router = APIRouter(prefix="/activities", tags=["activities"])
+
 
 @router.get("")
 def list_activities(
@@ -31,11 +35,16 @@ def list_activities(
         rows = cur.fetchall()
     return {"items": rows, "limit": limit, "offset": offset}
 
+
 @router.post("", status_code=201)
 def create_activity(payload: ActivityCreate):
     data = payload.model_dump()
     if not any([data.get("vehicle_id"), data.get("profile_id"), data.get("community_id"), data.get("item")]):
         raise HTTPException(400, "At least one of vehicle_id, profile_id, community_id or item must be provided.")
+
+    if data.get("details") is not None:
+        data["details"] = Jsonb(data["details"])
+
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -53,11 +62,16 @@ def create_activity(payload: ActivityCreate):
         conn.commit()
     return row
 
+
 @router.patch("/{activity_id}")
 def update_activity(activity_id: int, payload: ActivityUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
+
+    if fields.get("details") is not None:
+        fields["details"] = Jsonb(fields["details"])
+
     set_sql = ", ".join([f"{column}=%({column})s" for column in fields])
     fields["activity_id"] = activity_id
     with get_connection() as conn, conn.cursor() as cur:
@@ -70,6 +84,7 @@ def update_activity(activity_id: int, payload: ActivityUpdate):
     if not row:
         raise HTTPException(404, "Activity not found")
     return row
+
 
 @router.delete("/{activity_id}")
 def delete_activity(activity_id: int):
