@@ -36,6 +36,15 @@ def list_activities(
     return {"items": rows, "limit": limit, "offset": offset}
 
 
+@router.get("/{activity_id}")
+def get_activity(activity_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM activities WHERE id=%s", (activity_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Activity not found")
+    return row
+
 @router.post("", status_code=201)
 def create_activity(payload: ActivityCreate):
     data = payload.model_dump()

@@ -11,6 +11,15 @@ def list_platforms():
         rows = cur.fetchall()
     return {"items": rows}
 
+@router.get("/{platform_id}")
+def get_platform(platform_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM platforms WHERE id=%s", (platform_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Platform not found")
+    return row
+
 @router.post("", status_code=201)
 def create_platform(payload: PlatformCreate):
     with get_connection() as conn, conn.cursor() as cur:

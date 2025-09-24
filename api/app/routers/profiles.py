@@ -32,6 +32,15 @@ def list_profiles(
     return {"items": rows, "limit": limit, "offset": offset}
 
 
+@router.get("/{profile_id}")
+def get_profile(profile_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM profiles WHERE id=%s", (profile_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Profile not found")
+    return row
+
 @router.post("", status_code=201)
 def create_profile(payload: ProfileCreate):
     data = payload.model_dump()

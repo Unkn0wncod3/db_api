@@ -15,6 +15,15 @@ def list_vehicles():
     return {"items": rows}
 
 
+@router.get("/{vehicle_id}")
+def get_vehicle(vehicle_id: int):
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM vehicles WHERE id=%s", (vehicle_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Vehicle not found")
+    return row
+
 @router.post("", status_code=201)
 def create_vehicle(payload: VehicleCreate):
     data = payload.model_dump()
