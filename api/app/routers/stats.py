@@ -8,7 +8,7 @@ from ..db import get_connection
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
-CACHE_TTL = timedelta(minutes=20)
+CACHE_TTL = timedelta(minutes=2)
 
 # Simple in-process cache because Railway runs a single worker by default.
 _cache_lock = Lock()
