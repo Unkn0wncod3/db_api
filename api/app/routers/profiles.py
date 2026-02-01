@@ -52,10 +52,10 @@ def create_profile(payload: ProfileCreate):
             """
             INSERT INTO profiles (
                 platform_id, username, external_id, display_name, url, status,
-                language, region, is_verified, avatar_url, bio, metadata
+                last_seen_at, language, region, is_verified, avatar_url, bio, metadata
             ) VALUES (
                 %(platform_id)s, %(username)s, %(external_id)s, %(display_name)s, %(url)s, %(status)s,
-                %(language)s, %(region)s, %(is_verified)s, %(avatar_url)s, %(bio)s, %(metadata)s
+                %(last_seen_at)s, %(language)s, %(region)s, %(is_verified)s, %(avatar_url)s, %(bio)s, %(metadata)s
             ) RETURNING *;
             """,
             data,

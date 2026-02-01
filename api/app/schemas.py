@@ -80,6 +80,7 @@ class ProfileCreate(BaseModel):
     display_name: Optional[str] = None
     url: Optional[str] = None
     status: str = "active"
+    last_seen_at: Optional[datetime] = None
     language: Optional[str] = None
     region: Optional[str] = None
     is_verified: bool = False
@@ -94,6 +95,7 @@ class ProfileUpdate(BaseModel):
     display_name: Optional[str] = None
     url: Optional[str] = None
     status: Optional[str] = None
+    last_seen_at: Optional[datetime] = None
     language: Optional[str] = None
     region: Optional[str] = None
     is_verified: Optional[bool] = None
