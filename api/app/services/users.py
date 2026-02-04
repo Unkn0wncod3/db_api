@@ -2,7 +2,7 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
-from psycopg.errors import UniqueViolation
+from psycopg.errors import UniqueViolation, UndefinedTable
 
 from ..db import get_connection
 from ..security import hash_password
@@ -91,23 +91,27 @@ def ensure_default_admin() -> None:
     if not username or not password:
         return
 
-    with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT id FROM users WHERE role='admin' LIMIT 1;")
-        if cur.fetchone():
-            return
+    try:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE role='admin' LIMIT 1;")
+            if cur.fetchone():
+                return
 
-        password_hash = hash_password(password)
-        cur.execute(
-            f"""
-            INSERT INTO users (username, password_hash, role)
-            VALUES (%s, %s, 'admin')
-            ON CONFLICT (username) DO NOTHING
-            RETURNING {USER_COLUMNS};
-            """,
-            (username, password_hash),
-        )
-        created = cur.fetchone()
-        conn.commit()
+            password_hash = hash_password(password)
+            cur.execute(
+                f"""
+                INSERT INTO users (username, password_hash, role)
+                VALUES (%s, %s, 'admin')
+                ON CONFLICT (username) DO NOTHING
+                RETURNING {USER_COLUMNS};
+                """,
+                (username, password_hash),
+            )
+            created = cur.fetchone()
+            conn.commit()
+    except UndefinedTable:
+        print("[auth] users table not found yet; skipping default admin bootstrap")
+        return
 
     if created:
         print(f"[auth] Bootstrapped default admin user '{username}'")
