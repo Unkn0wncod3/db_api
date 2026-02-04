@@ -171,3 +171,14 @@ class ActivityUpdate(BaseModel):
     user_agent: Optional[str] = None
     geo_location: Optional[str] = None
     created_by: Optional[str] = None
+
+# -------- Auth --------
+class AuthLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: Dict[str, Any]

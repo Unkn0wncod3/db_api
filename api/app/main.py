@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
-from .routers import persons, notes, platforms, profiles, person_links, vehicles, activities, views, stats
+from .routers import auth, persons, notes, platforms, profiles, person_links, vehicles, activities, views, stats
 
 app = FastAPI(title="DB Manager API")
 
@@ -16,6 +16,7 @@ app.add_middleware(
 )
 
 app.include_router(persons.router)
+app.include_router(auth.router)
 app.include_router(notes.router)
 app.include_router(platforms.router)
 app.include_router(profiles.router)
