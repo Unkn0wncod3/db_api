@@ -1,12 +1,17 @@
 from typing import Optional, Any, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..schemas import ActivityCreate, ActivityUpdate
+from ..security import require_role
 
-router = APIRouter(prefix="/activities", tags=["activities"])
+router = APIRouter(
+    prefix="/activities",
+    tags=["activities"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 
 @router.get("")
@@ -45,7 +50,7 @@ def get_activity(activity_id: int):
         raise HTTPException(404, "Activity not found")
     return row
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_activity(payload: ActivityCreate):
     data = payload.model_dump()
     if not any([data.get("vehicle_id"), data.get("profile_id"), data.get("community_id"), data.get("item")]):
@@ -72,7 +77,7 @@ def create_activity(payload: ActivityCreate):
     return row
 
 
-@router.patch("/{activity_id}")
+@router.patch("/{activity_id}", dependencies=[Depends(require_role("admin"))])
 def update_activity(activity_id: int, payload: ActivityUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -95,7 +100,7 @@ def update_activity(activity_id: int, payload: ActivityUpdate):
     return row
 
 
-@router.delete("/{activity_id}")
+@router.delete("/{activity_id}", dependencies=[Depends(require_role("admin"))])
 def delete_activity(activity_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM activities WHERE id=%s RETURNING id;", (activity_id,))

@@ -1,12 +1,17 @@
 from typing import Optional, Any, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..schemas import ProfileCreate, ProfileUpdate
+from ..security import require_role
 
-router = APIRouter(prefix="/profiles", tags=["profiles"])
+router = APIRouter(
+    prefix="/profiles",
+    tags=["profiles"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 
 @router.get("")
@@ -41,7 +46,7 @@ def get_profile(profile_id: int):
         raise HTTPException(404, "Profile not found")
     return row
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_profile(payload: ProfileCreate):
     data = payload.model_dump()
     if data.get("metadata") is not None:
@@ -65,7 +70,7 @@ def create_profile(payload: ProfileCreate):
     return row
 
 
-@router.patch("/{profile_id}")
+@router.patch("/{profile_id}", dependencies=[Depends(require_role("admin"))])
 def update_profile(profile_id: int, payload: ProfileUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -88,7 +93,7 @@ def update_profile(profile_id: int, payload: ProfileUpdate):
     return row
 
 
-@router.delete("/{profile_id}")
+@router.delete("/{profile_id}", dependencies=[Depends(require_role("admin"))])
 def delete_profile(profile_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM profiles WHERE id=%s RETURNING id;", (profile_id,))

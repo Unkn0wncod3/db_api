@@ -1,8 +1,13 @@
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.encoders import jsonable_encoder
 from ..db import get_connection as _get_connection
+from ..security import require_role
 
-router = APIRouter(prefix="/views", tags=["views"])
+router = APIRouter(
+    prefix="/views",
+    tags=["views"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 def get_conn():
     return _get_connection()

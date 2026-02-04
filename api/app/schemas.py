@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
 
 # -------- Persons --------
@@ -172,7 +172,34 @@ class ActivityUpdate(BaseModel):
     geo_location: Optional[str] = None
     created_by: Optional[str] = None
 
-# -------- Auth --------
+# -------- Users & Auth --------
+Role = Literal["admin", "user"]
+
+
+class UserBase(BaseModel):
+    username: str = Field(..., min_length=3, max_length=64)
+    role: Role = "user"
+
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: Role
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class UserListResponse(BaseModel):
+    items: List[UserResponse]
+    limit: int
+    offset: int
+
+
 class AuthLoginRequest(BaseModel):
     username: str
     password: str
@@ -181,4 +208,4 @@ class AuthLoginRequest(BaseModel):
 class AuthLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: Dict[str, Any]
+    user: UserResponse

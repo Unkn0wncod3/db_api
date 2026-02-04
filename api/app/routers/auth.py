@@ -1,29 +1,27 @@
-import secrets
-from typing import Dict
-
 from fastapi import APIRouter, HTTPException, status
 
-from ..schemas import AuthLoginRequest, AuthLoginResponse
+from ..schemas import AuthLoginRequest, AuthLoginResponse, UserResponse
+from ..security import create_access_token, verify_password
+from ..services import users as user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-_HARDCODED_USER = {
-    "username": "admin",
-    "password": "c42",
-    "role": "admin",
-}
-
-def _authenticate(credentials: AuthLoginRequest) -> Dict[str, str]:
-    username_matches = secrets.compare_digest(credentials.username, _HARDCODED_USER["username"])
-    password_matches = secrets.compare_digest(credentials.password, _HARDCODED_USER["password"])
-    if not (username_matches and password_matches):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
-    return {k: v for k, v in _HARDCODED_USER.items() if k != "password"}
 
 
 @router.post("/login", response_model=AuthLoginResponse, status_code=status.HTTP_200_OK)
 def login(payload: AuthLoginRequest):
-    user = _authenticate(payload)
-    token = secrets.token_urlsafe(32)
-    return AuthLoginResponse(access_token=token, user=user)
+    db_user = user_service.get_user_by_username(payload.username, include_secret=True)
+    if not db_user or not db_user.get("is_active"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    if not verify_password(payload.password, db_user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
+    token = create_access_token(db_user)
+    user_payload = UserResponse(
+        id=db_user["id"],
+        username=db_user["username"],
+        role=db_user["role"],
+        is_active=db_user["is_active"],
+        created_at=db_user["created_at"],
+        updated_at=db_user.get("updated_at"),
+    )
+    return AuthLoginResponse(access_token=token, user=user_payload)

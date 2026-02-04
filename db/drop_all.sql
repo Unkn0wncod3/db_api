@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS vehicles              CASCADE;
 DROP TABLE IF EXISTS profiles              CASCADE;
 DROP TABLE IF EXISTS platforms             CASCADE;
 DROP TABLE IF EXISTS persons               CASCADE;
+DROP TABLE IF EXISTS users                 CASCADE;
 
 -- 3) Trigger
 DROP FUNCTION IF EXISTS set_updated_at()   CASCADE;

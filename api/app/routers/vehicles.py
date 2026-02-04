@@ -1,10 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..schemas import VehicleCreate, VehicleUpdate
+from ..security import require_role
 
-router = APIRouter(prefix="/vehicles", tags=["vehicles"])
+router = APIRouter(
+    prefix="/vehicles",
+    tags=["vehicles"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 
 @router.get("")
@@ -24,7 +29,7 @@ def get_vehicle(vehicle_id: int):
         raise HTTPException(404, "Vehicle not found")
     return row
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_vehicle(payload: VehicleCreate):
     data = payload.model_dump()
     if data.get("metadata") is not None:
@@ -48,7 +53,7 @@ def create_vehicle(payload: VehicleCreate):
     return row
 
 
-@router.patch("/{vehicle_id}")
+@router.patch("/{vehicle_id}", dependencies=[Depends(require_role("admin"))])
 def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -71,7 +76,7 @@ def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
     return row
 
 
-@router.delete("/{vehicle_id}")
+@router.delete("/{vehicle_id}", dependencies=[Depends(require_role("admin"))])
 def delete_vehicle(vehicle_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM vehicles WHERE id=%s RETURNING id;", (vehicle_id,))

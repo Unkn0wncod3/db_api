@@ -1,12 +1,17 @@
 from typing import Optional, Any, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..schemas import PersonCreate, PersonUpdate
+from ..security import require_role
 
-router = APIRouter(prefix="/persons", tags=["persons"])
+router = APIRouter(
+    prefix="/persons",
+    tags=["persons"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 
 @router.get("")
@@ -47,7 +52,7 @@ def get_person(person_id: int):
     return row
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_person(payload: PersonCreate):
     with get_connection() as conn, conn.cursor() as cur:
         data = payload.model_dump()
@@ -73,7 +78,7 @@ def create_person(payload: PersonCreate):
     return row
 
 
-@router.patch("/{person_id}")
+@router.patch("/{person_id}", dependencies=[Depends(require_role("admin"))])
 def update_person(person_id: int, payload: PersonUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -93,7 +98,7 @@ def update_person(person_id: int, payload: PersonUpdate):
     return row
 
 
-@router.delete("/{person_id}")
+@router.delete("/{person_id}", dependencies=[Depends(require_role("admin"))])
 def delete_person(person_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM persons WHERE id=%s RETURNING id;", (person_id,))

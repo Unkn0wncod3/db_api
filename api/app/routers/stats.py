@@ -2,11 +2,16 @@ from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Dict, Iterable, List, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from ..db import get_connection
+from ..security import require_role
 
-router = APIRouter(prefix="/stats", tags=["stats"])
+router = APIRouter(
+    prefix="/stats",
+    tags=["stats"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 CACHE_TTL = timedelta(minutes=2)
 
@@ -19,6 +24,17 @@ _cache_expires_at: Optional[datetime] = None
 TableConfig = Dict[str, Any]
 
 TABLES: List[TableConfig] = [
+    {
+        "key": "users",
+        "table": "users",
+        "created_field": "created_at",
+        "updated_field": "updated_at",
+        "recent": {
+            "fields": ["id", "username", "role", "created_at", "updated_at"],
+            "order": "COALESCE(updated_at, created_at)",
+            "limit": 5,
+        },
+    },
     {
         "key": "persons",
         "table": "persons",

@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from ..db import get_connection
 from ..schemas import LinkProfilePayload
+from ..security import require_role
 
-router = APIRouter(prefix="/persons", tags=["person-profile-links"])
+router = APIRouter(
+    prefix="/persons",
+    tags=["person-profile-links"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 @router.get("/{person_id}/profiles")
 def list_person_profiles(person_id: int):
@@ -21,7 +26,7 @@ def list_person_profiles(person_id: int):
         rows = cur.fetchall()
     return {"items": rows}
 
-@router.post("/{person_id}/profiles", status_code=201)
+@router.post("/{person_id}/profiles", status_code=201, dependencies=[Depends(require_role("admin"))])
 def link_person_profile(person_id: int, payload: LinkProfilePayload):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -37,7 +42,7 @@ def link_person_profile(person_id: int, payload: LinkProfilePayload):
         conn.commit()
     return row
 
-@router.delete("/{person_id}/profiles/{profile_id}")
+@router.delete("/{person_id}/profiles/{profile_id}", dependencies=[Depends(require_role("admin"))])
 def unlink_person_profile(person_id: int, profile_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(

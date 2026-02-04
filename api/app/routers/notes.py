@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from ..db import get_connection
 from ..schemas import NoteCreate, NoteUpdate
+from ..security import require_role
 
-router = APIRouter(prefix="/notes", tags=["notes"])
+router = APIRouter(
+    prefix="/notes",
+    tags=["notes"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 @router.get("")
 def list_notes():
@@ -20,7 +25,7 @@ def get_note(note_id: int):
         raise HTTPException(404, "Note not found")
     return row
 
-@router.patch("/{note_id}")
+@router.patch("/{note_id}", dependencies=[Depends(require_role("admin"))])
 def update_note(note_id: int, payload: NoteUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -38,7 +43,7 @@ def update_note(note_id: int, payload: NoteUpdate):
         raise HTTPException(404, "Note not found")
     return row
 
-@router.delete("/{note_id}")
+@router.delete("/{note_id}", dependencies=[Depends(require_role("admin"))])
 def delete_note(note_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM notes WHERE id=%s RETURNING id;", (note_id,))
@@ -55,7 +60,7 @@ def list_person_notes(person_id: int):
         rows = cur.fetchall()
     return {"items": rows}
 
-@router.post("/by-person/{person_id}", status_code=201)
+@router.post("/by-person/{person_id}", status_code=201, dependencies=[Depends(require_role("admin"))])
 def add_person_note(person_id: int, payload: NoteCreate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(

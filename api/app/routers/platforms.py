@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from ..db import get_connection
 from ..schemas import PlatformCreate, PlatformUpdate
+from ..security import require_role
 
-router = APIRouter(prefix="/platforms", tags=["platforms"])
+router = APIRouter(
+    prefix="/platforms",
+    tags=["platforms"],
+    dependencies=[Depends(require_role("user", "admin"))],
+)
 
 @router.get("")
 def list_platforms():
@@ -20,7 +25,7 @@ def get_platform(platform_id: int):
         raise HTTPException(404, "Platform not found")
     return row
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_platform(payload: PlatformCreate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -35,7 +40,7 @@ def create_platform(payload: PlatformCreate):
         conn.commit()
     return row
 
-@router.patch("/{platform_id}")
+@router.patch("/{platform_id}", dependencies=[Depends(require_role("admin"))])
 def update_platform(platform_id: int, payload: PlatformUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -53,7 +58,7 @@ def update_platform(platform_id: int, payload: PlatformUpdate):
         raise HTTPException(404, "Platform not found")
     return row
 
-@router.delete("/{platform_id}")
+@router.delete("/{platform_id}", dependencies=[Depends(require_role("admin"))])
 def delete_platform(platform_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM platforms WHERE id=%s RETURNING id;", (platform_id,))
