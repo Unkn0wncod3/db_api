@@ -26,6 +26,7 @@ def test_notes_full_crud_flow(client):
     note_id = note["id"]
     assert note["person_id"] == person_id
     assert note["title"] == note_payload["title"]
+    assert note["visibility_level"] == "user"
 
     read_resp = client.get(f"/notes/{note_id}")
     assert read_resp.status_code == 200

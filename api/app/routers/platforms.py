@@ -1,25 +1,40 @@
+from typing import Dict
+
 from fastapi import APIRouter, Depends, HTTPException
 from ..db import get_connection
 from ..schemas import PlatformCreate, PlatformUpdate
 from ..security import require_role
+from ..visibility import visibility_clause_for_role
 
 router = APIRouter(
     prefix="/platforms",
     tags=["platforms"],
-    dependencies=[Depends(require_role("user", "admin"))],
 )
 
 @router.get("")
-def list_platforms():
+def list_platforms(current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM platforms ORDER BY id;")
+        sql = "SELECT * FROM platforms p WHERE 1=1"
+        params = []
+        clause, clause_params = visibility_clause_for_role(current_user["role"], alias="p")
+        if clause:
+            sql += f" AND {clause}"
+            params.extend(clause_params)
+        sql += " ORDER BY p.id"
+        cur.execute(sql, params)
         rows = cur.fetchall()
     return {"items": rows}
 
 @router.get("/{platform_id}")
-def get_platform(platform_id: int):
+def get_platform(platform_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM platforms WHERE id=%s", (platform_id,))
+        sql = "SELECT * FROM platforms p WHERE p.id=%s"
+        params = [platform_id]
+        clause, clause_params = visibility_clause_for_role(current_user["role"], alias="p")
+        if clause:
+            sql += f" AND {clause}"
+            params.extend(clause_params)
+        cur.execute(sql, params)
         row = cur.fetchone()
     if not row:
         raise HTTPException(404, "Platform not found")
@@ -30,11 +45,18 @@ def create_platform(payload: PlatformCreate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO platforms (name, category, base_url, api_base_url, is_active)
-            VALUES (%s,%s,%s,%s,%s)
+            INSERT INTO platforms (name, category, base_url, api_base_url, is_active, visibility_level)
+            VALUES (%s,%s,%s,%s,%s,%s)
             RETURNING *;
             """,
-            (payload.name, payload.category, payload.base_url, payload.api_base_url, payload.is_active),
+            (
+                payload.name,
+                payload.category,
+                payload.base_url,
+                payload.api_base_url,
+                payload.is_active,
+                payload.visibility_level,
+            ),
         )
         row = cur.fetchone()
         conn.commit()

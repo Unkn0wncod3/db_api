@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
@@ -6,11 +6,11 @@ from psycopg.types.json import Jsonb
 from ..db import get_connection
 from ..schemas import ProfileCreate, ProfileUpdate
 from ..security import require_role
+from ..visibility import visibility_clause_for_role
 
 router = APIRouter(
     prefix="/profiles",
     tags=["profiles"],
-    dependencies=[Depends(require_role("user", "admin"))],
 )
 
 
@@ -20,8 +20,9 @@ def list_profiles(
     username: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    current_user: Dict[str, Any] = Depends(require_role("user", "admin")),
 ):
-    sql = "SELECT * FROM profiles WHERE 1=1"
+    sql = "SELECT * FROM profiles pr WHERE 1=1"
     params: List[Any] = []
     if platform_id:
         sql += " AND platform_id=%s"
@@ -29,6 +30,10 @@ def list_profiles(
     if username:
         sql += " AND username ILIKE %s"
         params.append(f"%{username}%")
+    clause, clause_params = visibility_clause_for_role(current_user["role"], alias="pr")
+    if clause:
+        sql += f" AND {clause}"
+        params.extend(clause_params)
     sql += " ORDER BY id LIMIT %s OFFSET %s"
     params += [limit, offset]
     with get_connection() as conn, conn.cursor() as cur:
@@ -38,9 +43,15 @@ def list_profiles(
 
 
 @router.get("/{profile_id}")
-def get_profile(profile_id: int):
+def get_profile(profile_id: int, current_user: Dict[str, Any] = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM profiles WHERE id=%s", (profile_id,))
+        sql = "SELECT * FROM profiles pr WHERE pr.id=%s"
+        params = [profile_id]
+        clause, clause_params = visibility_clause_for_role(current_user["role"], alias="pr")
+        if clause:
+            sql += f" AND {clause}"
+            params.extend(clause_params)
+        cur.execute(sql, params)
         row = cur.fetchone()
     if not row:
         raise HTTPException(404, "Profile not found")
@@ -57,10 +68,10 @@ def create_profile(payload: ProfileCreate):
             """
             INSERT INTO profiles (
                 platform_id, username, external_id, display_name, url, status,
-                last_seen_at, language, region, is_verified, avatar_url, bio, metadata
+                last_seen_at, language, region, is_verified, avatar_url, bio, metadata, visibility_level
             ) VALUES (
                 %(platform_id)s, %(username)s, %(external_id)s, %(display_name)s, %(url)s, %(status)s,
-                %(last_seen_at)s, %(language)s, %(region)s, %(is_verified)s, %(avatar_url)s, %(bio)s, %(metadata)s
+                %(last_seen_at)s, %(language)s, %(region)s, %(is_verified)s, %(avatar_url)s, %(bio)s, %(metadata)s, %(visibility_level)s
             ) RETURNING *;
             """,
             data,

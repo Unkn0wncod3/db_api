@@ -15,6 +15,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ---------- Visibility Level Enum ----------
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type WHERE typname = 'visibility_level_enum'
+  ) THEN
+    CREATE TYPE visibility_level_enum AS ENUM ('admin', 'user');
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
 -- ============================================================
 -- Users & Roles
 -- ============================================================
@@ -70,7 +81,8 @@ CREATE TABLE IF NOT EXISTS persons (
     risk_level        TEXT,                              -- z.B. low|medium|high
     tags              TEXT[] DEFAULT '{}',               -- freie Tagging-Liste
     notes             TEXT,                              -- freie Langnotiz
-    metadata          JSONB DEFAULT '{}'::jsonb          -- flexible Zusatzdaten
+    metadata          JSONB DEFAULT '{}'::jsonb,         -- flexible Zusatzdaten
+    visibility_level  visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE INDEX IF NOT EXISTS idx_persons_last_first
@@ -94,7 +106,8 @@ CREATE TABLE IF NOT EXISTS notes (
     text TEXT NOT NULL,
     pinned BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_person
@@ -114,7 +127,8 @@ CREATE TABLE IF NOT EXISTS platforms (
     api_base_url TEXT,
     is_active    BOOLEAN NOT NULL DEFAULT TRUE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ
+    updated_at   TIMESTAMPTZ,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_platforms_name
@@ -145,7 +159,8 @@ CREATE TABLE IF NOT EXISTS profiles (
     is_verified    BOOLEAN DEFAULT FALSE,
     avatar_url     TEXT,
     bio            TEXT,
-    metadata       JSONB DEFAULT '{}'::jsonb
+    metadata       JSONB DEFAULT '{}'::jsonb,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_platform_username
@@ -169,6 +184,7 @@ CREATE TABLE IF NOT EXISTS person_profile_map (
     profile_id  INT NOT NULL REFERENCES profiles(id)  ON DELETE CASCADE,
     linked_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     note        TEXT,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user',
     PRIMARY KEY (person_id, profile_id)
 );
 
@@ -190,7 +206,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
     last_service_at TIMESTAMPTZ,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ,
-    metadata       JSONB DEFAULT '{}'::jsonb
+    metadata       JSONB DEFAULT '{}'::jsonb,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_vehicles_license_plate
@@ -219,7 +236,8 @@ CREATE TABLE IF NOT EXISTS usages (
     location     TEXT,
     cost_amount  NUMERIC(12,2),
     currency     TEXT DEFAULT 'EUR',
-    metadata     JSONB DEFAULT '{}'::jsonb
+    metadata     JSONB DEFAULT '{}'::jsonb,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE INDEX IF NOT EXISTS idx_usages_person_date
@@ -236,7 +254,8 @@ CREATE TABLE IF NOT EXISTS games (
     publisher   TEXT,
     genre       TEXT,
     release_year INT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_games_name
@@ -252,7 +271,8 @@ CREATE TABLE IF NOT EXISTS game_profiles (
     rank         TEXT,
     hours_played INT DEFAULT 0,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata     JSONB DEFAULT '{}'::jsonb
+    metadata     JSONB DEFAULT '{}'::jsonb,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_game_profiles_unique
@@ -271,7 +291,8 @@ CREATE TABLE IF NOT EXISTS communities (
     member_count INT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ,
-    metadata     JSONB DEFAULT '{}'::jsonb
+    metadata     JSONB DEFAULT '{}'::jsonb,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_communities_platform_external
@@ -292,7 +313,8 @@ CREATE TABLE IF NOT EXISTS community_memberships (
     is_active     BOOLEAN NOT NULL DEFAULT TRUE,
     joined_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     left_at       TIMESTAMPTZ,
-    metadata      JSONB DEFAULT '{}'::jsonb
+    metadata      JSONB DEFAULT '{}'::jsonb,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_membership_unique
@@ -324,6 +346,7 @@ CREATE TABLE IF NOT EXISTS activities (
     geo_location  TEXT,                          -- "Berlin, DE" o.ä.
     created_by    TEXT,                          -- Benutzername/System
     updated_at    TIMESTAMPTZ,
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'user',
 
     -- Mindestens EIN Target-Feld sollte befüllt sein
     CONSTRAINT chk_activities_target CHECK (
@@ -359,7 +382,9 @@ SELECT
   a.source,
   a.geo_location,
   a.notes,
-  a.details
+  a.details,
+  per.visibility_level AS person_visibility_level,
+  a.visibility_level   AS activity_visibility_level
 FROM activities a
 JOIN persons per ON per.id = a.person_id
 LEFT JOIN vehicles v ON v.id = a.vehicle_id
@@ -374,8 +399,13 @@ SELECT
   pr.display_name,
   pr.status,
   pr.last_seen_at,
-  pr.url
+  pr.url,
+  ppm.visibility_level AS link_visibility_level,
+  pr.visibility_level  AS profile_visibility_level,
+  pf.visibility_level  AS platform_visibility_level,
+  per.visibility_level AS person_visibility_level
 FROM person_profile_map ppm
+JOIN persons per ON per.id = ppm.person_id
 JOIN profiles pr  ON pr.id = ppm.profile_id
 JOIN platforms pf ON pf.id = pr.platform_id;
 
@@ -386,6 +416,7 @@ SELECT
   p.first_name || ' ' || p.last_name AS person_name,
   p.email,
   p.status,
+  p.visibility_level,
   COUNT(DISTINCT ppm.profile_id)    AS profiles_count,
   COUNT(DISTINCT a.id)              AS activities_count,
   COUNT(DISTINCT n.id)              AS notes_count
@@ -393,4 +424,4 @@ FROM persons p
 LEFT JOIN person_profile_map ppm ON ppm.person_id = p.id
 LEFT JOIN activities a          ON a.person_id   = p.id
 LEFT JOIN notes n               ON n.person_id   = p.id
-GROUP BY p.id, p.first_name, p.last_name, p.email, p.status;
+GROUP BY p.id, p.first_name, p.last_name, p.email, p.status, p.visibility_level;

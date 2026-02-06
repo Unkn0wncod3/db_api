@@ -1,29 +1,44 @@
+from typing import Dict
+
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..schemas import VehicleCreate, VehicleUpdate
 from ..security import require_role
+from ..visibility import visibility_clause_for_role
 
 router = APIRouter(
     prefix="/vehicles",
     tags=["vehicles"],
-    dependencies=[Depends(require_role("user", "admin"))],
 )
 
 
 @router.get("")
-def list_vehicles():
+def list_vehicles(current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM vehicles ORDER BY id;")
+        sql = "SELECT * FROM vehicles v WHERE 1=1"
+        params = []
+        clause, clause_params = visibility_clause_for_role(current_user["role"], alias="v")
+        if clause:
+            sql += f" AND {clause}"
+            params.extend(clause_params)
+        sql += " ORDER BY v.id"
+        cur.execute(sql, params)
         rows = cur.fetchall()
     return {"items": rows}
 
 
 @router.get("/{vehicle_id}")
-def get_vehicle(vehicle_id: int):
+def get_vehicle(vehicle_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM vehicles WHERE id=%s", (vehicle_id,))
+        sql = "SELECT * FROM vehicles v WHERE v.id=%s"
+        params = [vehicle_id]
+        clause, clause_params = visibility_clause_for_role(current_user["role"], alias="v")
+        if clause:
+            sql += f" AND {clause}"
+            params.extend(clause_params)
+        cur.execute(sql, params)
         row = cur.fetchone()
     if not row:
         raise HTTPException(404, "Vehicle not found")
@@ -40,10 +55,10 @@ def create_vehicle(payload: VehicleCreate):
             """
             INSERT INTO vehicles (
                 label, make, model, build_year, license_plate, vin, vehicle_type,
-                energy_type, color, mileage_km, last_service_at, metadata
+                energy_type, color, mileage_km, last_service_at, metadata, visibility_level
             ) VALUES (
                 %(label)s,%(make)s,%(model)s,%(build_year)s,%(license_plate)s,%(vin)s,%(vehicle_type)s,
-                %(energy_type)s,%(color)s,%(mileage_km)s,%(last_service_at)s,%(metadata)s
+                %(energy_type)s,%(color)s,%(mileage_km)s,%(last_service_at)s,%(metadata)s,%(visibility_level)s
             ) RETURNING *;
             """,
             data,

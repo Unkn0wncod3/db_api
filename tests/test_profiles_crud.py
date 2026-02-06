@@ -21,12 +21,14 @@ def test_profiles_full_crud_flow(client):
         "display_name": "Initial User",
         "status": "active",
         "metadata": None,
+        "visibility_level": "admin",
     }
     create_resp = client.post("/profiles", json=profile_payload)
     assert create_resp.status_code == 201
     profile = create_resp.json()
     profile_id = profile["id"]
     assert profile["username"] == profile_payload["username"]
+    assert profile["visibility_level"] == "admin"
 
     list_resp = client.get("/profiles", params={"username": profile_payload["username"]})
     assert list_resp.status_code == 200
@@ -39,6 +41,7 @@ def test_profiles_full_crud_flow(client):
     updated = update_resp.json()
     assert updated["display_name"] == "Updated User"
     assert updated["is_verified"] is True
+    assert updated["visibility_level"] == "admin"
 
     delete_resp = client.delete(f"/profiles/{profile_id}")
     assert delete_resp.status_code == 200

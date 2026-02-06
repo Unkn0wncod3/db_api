@@ -11,12 +11,14 @@ def test_vehicles_full_crud_flow(client):
         "energy_type": "electric",
         "color": "white",
         "metadata": None,
+        "visibility_level": "user",
     }
     create_resp = client.post("/vehicles", json=create_payload)
     assert create_resp.status_code == 201
     vehicle = create_resp.json()
     vehicle_id = vehicle["id"]
     assert vehicle["label"] == create_payload["label"]
+    assert vehicle["visibility_level"] == "user"
 
     list_resp = client.get("/vehicles")
     assert list_resp.status_code == 200

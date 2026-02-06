@@ -22,6 +22,7 @@ def test_activities_full_crud_flow(client):
         "item": "initial-item",
         "notes": "Initial notes",
         "details": None,
+        "visibility_level": "user",
     }
     create_resp = client.post("/activities", json=activity_payload)
     assert create_resp.status_code == 201
@@ -29,6 +30,7 @@ def test_activities_full_crud_flow(client):
     activity_id = activity["id"]
     assert activity["person_id"] == person_id
     assert activity["item"] == "initial-item"
+    assert activity["visibility_level"] == "user"
 
     list_resp = client.get("/activities", params={"person_id": person_id})
     assert list_resp.status_code == 200

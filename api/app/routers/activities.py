@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
@@ -6,11 +6,11 @@ from psycopg.types.json import Jsonb
 from ..db import get_connection
 from ..schemas import ActivityCreate, ActivityUpdate
 from ..security import require_role
+from ..visibility import visibility_clause_for_role
 
 router = APIRouter(
     prefix="/activities",
     tags=["activities"],
-    dependencies=[Depends(require_role("user", "admin"))],
 )
 
 
@@ -21,18 +21,32 @@ def list_activities(
     since: Optional[str] = None,  # ISO-String; DB TIMESTAMPTZ cast
     limit: int = 100,
     offset: int = 0,
+    current_user: Dict[str, Any] = Depends(require_role("user", "admin")),
 ):
-    sql = "SELECT * FROM activities WHERE 1=1"
+    sql = """
+    SELECT a.*
+    FROM activities a
+    JOIN persons p ON p.id = a.person_id
+    WHERE 1=1
+    """
     params: List[Any] = []
     if person_id:
-        sql += " AND person_id=%s"
+        sql += " AND a.person_id=%s"
         params.append(person_id)
     if activity_type:
-        sql += " AND activity_type=%s"
+        sql += " AND a.activity_type=%s"
         params.append(activity_type)
     if since:
-        sql += " AND occurred_at >= %s::timestamptz"
+        sql += " AND a.occurred_at >= %s::timestamptz"
         params.append(since)
+    activity_clause, activity_params = visibility_clause_for_role(current_user["role"], alias="a")
+    if activity_clause:
+        sql += f" AND {activity_clause}"
+        params.extend(activity_params)
+    person_clause, person_params = visibility_clause_for_role(current_user["role"], alias="p")
+    if person_clause:
+        sql += f" AND {person_clause}"
+        params.extend(person_params)
     sql += " ORDER BY occurred_at DESC LIMIT %s OFFSET %s"
     params += [limit, offset]
     with get_connection() as conn, conn.cursor() as cur:
@@ -42,9 +56,24 @@ def list_activities(
 
 
 @router.get("/{activity_id}")
-def get_activity(activity_id: int):
+def get_activity(activity_id: int, current_user: Dict[str, Any] = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM activities WHERE id=%s", (activity_id,))
+        sql = """
+        SELECT a.*
+        FROM activities a
+        JOIN persons p ON p.id = a.person_id
+        WHERE a.id=%s
+        """
+        params = [activity_id]
+        activity_clause, activity_params = visibility_clause_for_role(current_user["role"], alias="a")
+        if activity_clause:
+            sql += f" AND {activity_clause}"
+            params.extend(activity_params)
+        person_clause, person_params = visibility_clause_for_role(current_user["role"], alias="p")
+        if person_clause:
+            sql += f" AND {person_clause}"
+            params.extend(person_params)
+        cur.execute(sql, params)
         row = cur.fetchone()
     if not row:
         raise HTTPException(404, "Activity not found")
@@ -64,10 +93,10 @@ def create_activity(payload: ActivityCreate):
             """
             INSERT INTO activities (
                 person_id, activity_type, occurred_at, vehicle_id, profile_id, community_id,
-                item, notes, details, severity, source, ip_address, user_agent, geo_location, created_by
+                item, notes, details, severity, source, ip_address, user_agent, geo_location, created_by, visibility_level
             ) VALUES (
                 %(person_id)s, %(activity_type)s, %(occurred_at)s, %(vehicle_id)s, %(profile_id)s, %(community_id)s,
-                %(item)s, %(notes)s, %(details)s, %(severity)s, %(source)s, %(ip_address)s, %(user_agent)s, %(geo_location)s, %(created_by)s
+                %(item)s, %(notes)s, %(details)s, %(severity)s, %(source)s, %(ip_address)s, %(user_agent)s, %(geo_location)s, %(created_by)s, %(visibility_level)s
             ) RETURNING *;
             """,
             data,

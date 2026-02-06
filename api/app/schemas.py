@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
+from .visibility import VisibilityLevel, VISIBILITY_USER
 
 # -------- Persons --------
 class PersonCreate(BaseModel):
@@ -23,6 +24,7 @@ class PersonCreate(BaseModel):
     tags: Optional[List[str]] = Field(default_factory=list)
     notes: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    visibility_level: VisibilityLevel = VISIBILITY_USER
 
 class PersonUpdate(BaseModel):
     first_name: Optional[str] = None
@@ -45,17 +47,20 @@ class PersonUpdate(BaseModel):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Notes --------
 class NoteCreate(BaseModel):
     title: Optional[str] = None
     text: str
     pinned: bool = False
+    visibility_level: VisibilityLevel = VISIBILITY_USER
 
 class NoteUpdate(BaseModel):
     title: Optional[str] = None
     text: Optional[str] = None
     pinned: Optional[bool] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Platforms --------
 class PlatformCreate(BaseModel):
@@ -64,6 +69,7 @@ class PlatformCreate(BaseModel):
     base_url: Optional[str] = None
     api_base_url: Optional[str] = None
     is_active: bool = True
+    visibility_level: VisibilityLevel = VISIBILITY_USER
 
 class PlatformUpdate(BaseModel):
     name: Optional[str] = None
@@ -71,6 +77,7 @@ class PlatformUpdate(BaseModel):
     base_url: Optional[str] = None
     api_base_url: Optional[str] = None
     is_active: Optional[bool] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Profiles --------
 class ProfileCreate(BaseModel):
@@ -87,6 +94,7 @@ class ProfileCreate(BaseModel):
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    visibility_level: VisibilityLevel = VISIBILITY_USER
 
 class ProfileUpdate(BaseModel):
     platform_id: Optional[int] = None
@@ -102,11 +110,13 @@ class ProfileUpdate(BaseModel):
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Person ↔ Profile --------
 class LinkProfilePayload(BaseModel):
     profile_id: int
     note: Optional[str] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Vehicles --------
 class VehicleCreate(BaseModel):
@@ -122,6 +132,7 @@ class VehicleCreate(BaseModel):
     mileage_km: Optional[int] = None
     last_service_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    visibility_level: VisibilityLevel = VISIBILITY_USER
 
 class VehicleUpdate(BaseModel):
     label: Optional[str] = None
@@ -136,6 +147,7 @@ class VehicleUpdate(BaseModel):
     mileage_km: Optional[int] = None
     last_service_at: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Activities --------
 class ActivityCreate(BaseModel):
@@ -154,6 +166,7 @@ class ActivityCreate(BaseModel):
     user_agent: Optional[str] = None
     geo_location: Optional[str] = None
     created_by: Optional[str] = None
+    visibility_level: VisibilityLevel = VISIBILITY_USER
 
 class ActivityUpdate(BaseModel):
     person_id: Optional[int] = None
@@ -171,6 +184,7 @@ class ActivityUpdate(BaseModel):
     user_agent: Optional[str] = None
     geo_location: Optional[str] = None
     created_by: Optional[str] = None
+    visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Users & Auth --------
 Role = Literal["admin", "user"]

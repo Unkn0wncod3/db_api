@@ -1,29 +1,64 @@
+from typing import Dict
+
 from fastapi import APIRouter, Depends, HTTPException
+
 from ..db import get_connection
 from ..schemas import NoteCreate, NoteUpdate
 from ..security import require_role
+from ..visibility import visibility_clause_for_role
 
 router = APIRouter(
     prefix="/notes",
     tags=["notes"],
-    dependencies=[Depends(require_role("user", "admin"))],
 )
 
+
+def _append_visibility_filters(sql: str, params: list, role: str) -> tuple[str, list]:
+    clause, clause_params = visibility_clause_for_role(role, alias="n")
+    if clause:
+        sql += f" AND {clause}"
+        params.extend(clause_params)
+    person_clause, person_params = visibility_clause_for_role(role, alias="p")
+    if person_clause:
+        sql += f" AND {person_clause}"
+        params.extend(person_params)
+    return sql, params
+
+
 @router.get("")
-def list_notes():
+def list_notes(current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM notes ORDER BY id;")
+        sql = """
+        SELECT n.*
+        FROM notes n
+        JOIN persons p ON p.id = n.person_id
+        WHERE 1=1
+        """
+        params: list = []
+        sql, params = _append_visibility_filters(sql, params, current_user["role"])
+        sql += " ORDER BY n.id"
+        cur.execute(sql, params)
         rows = cur.fetchall()
     return {"items": rows}
 
+
 @router.get("/{note_id}")
-def get_note(note_id: int):
+def get_note(note_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM notes WHERE id=%s;", (note_id,))
+        sql = """
+        SELECT n.*
+        FROM notes n
+        JOIN persons p ON p.id = n.person_id
+        WHERE n.id=%s
+        """
+        params = [note_id]
+        sql, params = _append_visibility_filters(sql, params, current_user["role"])
+        cur.execute(sql, params)
         row = cur.fetchone()
     if not row:
         raise HTTPException(404, "Note not found")
     return row
+
 
 @router.patch("/{note_id}", dependencies=[Depends(require_role("admin"))])
 def update_note(note_id: int, payload: NoteUpdate):
@@ -43,6 +78,7 @@ def update_note(note_id: int, payload: NoteUpdate):
         raise HTTPException(404, "Note not found")
     return row
 
+
 @router.delete("/{note_id}", dependencies=[Depends(require_role("admin"))])
 def delete_note(note_id: int):
     with get_connection() as conn, conn.cursor() as cur:
@@ -53,23 +89,34 @@ def delete_note(note_id: int):
         raise HTTPException(404, "Note not found")
     return {"deleted": row["id"]}
 
+
 @router.get("/by-person/{person_id}")
-def list_person_notes(person_id: int):
+def list_person_notes(person_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM notes WHERE person_id=%s ORDER BY id DESC;", (person_id,))
+        sql = """
+        SELECT n.*
+        FROM notes n
+        JOIN persons p ON p.id = n.person_id
+        WHERE p.id=%s
+        """
+        params = [person_id]
+        sql, params = _append_visibility_filters(sql, params, current_user["role"])
+        sql += " ORDER BY n.id DESC"
+        cur.execute(sql, params)
         rows = cur.fetchall()
     return {"items": rows}
+
 
 @router.post("/by-person/{person_id}", status_code=201, dependencies=[Depends(require_role("admin"))])
 def add_person_note(person_id: int, payload: NoteCreate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO notes (person_id, title, text, pinned)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO notes (person_id, title, text, pinned, visibility_level)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING *;
             """,
-            (person_id, payload.title, payload.text, payload.pinned),
+            (person_id, payload.title, payload.text, payload.pinned, payload.visibility_level),
         )
         row = cur.fetchone()
         conn.commit()

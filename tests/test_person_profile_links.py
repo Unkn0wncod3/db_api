@@ -37,13 +37,14 @@ def test_person_profile_linking_flow(client):
     assert profile_resp.status_code == 201
     profile_id = profile_resp.json()["id"]
 
-    link_payload = {"profile_id": profile_id, "note": "Initial link"}
+    link_payload = {"profile_id": profile_id, "note": "Initial link", "visibility_level": "admin"}
     link_resp = client.post(f"/persons/{person_id}/profiles", json=link_payload)
     assert link_resp.status_code == 201
     link_data = link_resp.json()
     assert link_data["person_id"] == person_id
     assert link_data["profile_id"] == profile_id
     assert link_data["note"] == "Initial link"
+    assert link_data["visibility_level"] == "admin"
 
     list_resp = client.get(f"/persons/{person_id}/profiles")
     assert list_resp.status_code == 200

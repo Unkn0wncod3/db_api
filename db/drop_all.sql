@@ -24,5 +24,6 @@ DROP TABLE IF EXISTS users                 CASCADE;
 
 -- 3) Trigger
 DROP FUNCTION IF EXISTS set_updated_at()   CASCADE;
+DROP TYPE IF EXISTS visibility_level_enum  CASCADE;
 
 COMMIT;
