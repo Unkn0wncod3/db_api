@@ -37,7 +37,10 @@ def test_person_profile_linking_flow(client):
     assert profile_resp.status_code == 201
     profile_id = profile_resp.json()["id"]
 
-    link_payload = {"profile_id": profile_id, "note": "Initial link", "visibility_level": "admin"}
+    elevate_resp = client.patch(f"/persons/{person_id}", json={"visibility_level": "admin"})
+    assert elevate_resp.status_code == 200
+
+    link_payload = {"profile_id": profile_id, "note": "Initial link"}
     link_resp = client.post(f"/persons/{person_id}/profiles", json=link_payload)
     assert link_resp.status_code == 201
     link_data = link_resp.json()

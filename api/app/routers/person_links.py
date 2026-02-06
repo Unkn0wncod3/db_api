@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..db import get_connection
 from ..schemas import LinkProfilePayload
 from ..security import require_role
-from ..visibility import visibility_clause_for_role
+from ..visibility import inherit_visibility, visibility_clause_for_role
 
 router = APIRouter(
     prefix="/persons",
@@ -36,16 +36,21 @@ def list_person_profiles(person_id: int, current_user: Dict = Depends(require_ro
 @router.post("/{person_id}/profiles", status_code=201, dependencies=[Depends(require_role("admin"))])
 def link_person_profile(person_id: int, payload: LinkProfilePayload):
     with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (person_id,))
+        person = cur.fetchone()
+        if not person:
+            raise HTTPException(404, "Person not found")
+        link_visibility = inherit_visibility(person["visibility_level"], payload.visibility_level)
         cur.execute(
             """
             INSERT INTO person_profile_map (person_id, profile_id, note, visibility_level)
-            VALUES (%s, %s, %s, COALESCE(%s, 'user'))
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (person_id, profile_id) DO UPDATE
             SET note = EXCLUDED.note,
-                visibility_level = COALESCE(EXCLUDED.visibility_level, person_profile_map.visibility_level)
+                visibility_level = EXCLUDED.visibility_level
             RETURNING *;
             """,
-            (person_id, payload.profile_id, payload.note, payload.visibility_level),
+            (person_id, payload.profile_id, payload.note, link_visibility),
         )
         row = cur.fetchone()
         conn.commit()

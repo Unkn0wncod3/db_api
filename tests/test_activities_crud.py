@@ -54,3 +54,35 @@ def test_activities_full_crud_flow(client):
     cleanup_resp = client.delete(f"/persons/{person_id}")
     assert cleanup_resp.status_code == 200
     assert cleanup_resp.json()["deleted"] == person_id
+
+
+def test_activity_inherits_person_visibility(client):
+    person_payload = {
+        "first_name": "Admin",
+        "last_name": "Only",
+        "email": f"activity-inherit-{uuid.uuid4()}@example.com",
+        "visibility_level": "admin",
+        "tags": None,
+        "metadata": None,
+    }
+    person_id = client.post("/persons", json=person_payload).json()["id"]
+
+    activity_payload = {
+        "person_id": person_id,
+        "activity_type": "login",
+        "occurred_at": "2024-02-01T00:00:00Z",
+        "item": "admin-only",
+        "notes": "inherit test",
+    }
+    create_resp = client.post("/activities", json=activity_payload)
+    assert create_resp.status_code == 201
+    assert create_resp.json()["visibility_level"] == "admin"
+
+    downgrade_resp = client.patch(f"/persons/{person_id}", json={"visibility_level": "user"})
+    assert downgrade_resp.status_code == 200
+
+    list_resp = client.get("/activities", params={"person_id": person_id})
+    assert list_resp.status_code == 200
+    assert list_resp.json()["items"][0]["visibility_level"] == "user"
+
+    client.delete(f"/persons/{person_id}")

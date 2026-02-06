@@ -6,7 +6,7 @@ from psycopg.types.json import Jsonb
 from ..db import get_connection
 from ..schemas import ActivityCreate, ActivityUpdate
 from ..security import require_role
-from ..visibility import visibility_clause_for_role
+from ..visibility import inherit_visibility, visibility_clause_for_role
 
 router = APIRouter(
     prefix="/activities",
@@ -89,6 +89,11 @@ def create_activity(payload: ActivityCreate):
         data["details"] = Jsonb(data["details"])
 
     with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (data["person_id"],))
+        person = cur.fetchone()
+        if not person:
+            raise HTTPException(404, "Person not found")
+        data["visibility_level"] = inherit_visibility(person["visibility_level"], data.get("visibility_level"))
         cur.execute(
             """
             INSERT INTO activities (

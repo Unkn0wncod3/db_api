@@ -50,3 +50,36 @@ def test_notes_full_crud_flow(client):
     cleanup_resp = client.delete(f"/persons/{person_id}")
     assert cleanup_resp.status_code == 200
     assert cleanup_resp.json()["deleted"] == person_id
+
+
+def test_notes_follow_person_visibility(client):
+    person_payload = {
+        "first_name": "Visibility",
+        "last_name": "Chain",
+        "email": f"note-inherit-{uuid.uuid4()}@example.com",
+        "tags": None,
+        "metadata": None,
+    }
+    person_resp = client.post("/persons", json=person_payload)
+    assert person_resp.status_code == 201
+    person = person_resp.json()
+    person_id = person["id"]
+
+    note_payload = {"title": "Inherited", "text": "inheritance", "pinned": False}
+    note_resp = client.post(f"/notes/by-person/{person_id}", json=note_payload)
+    assert note_resp.status_code == 201
+    note = note_resp.json()
+    assert note["visibility_level"] == "user"
+
+    patch_resp = client.patch(f"/persons/{person_id}", json={"visibility_level": "admin"})
+    assert patch_resp.status_code == 200
+
+    refreshed = client.get(f"/notes/{note['id']}").json()
+    assert refreshed["visibility_level"] == "admin"
+
+    second_note_resp = client.post(f"/notes/by-person/{person_id}", json=note_payload)
+    assert second_note_resp.status_code == 201
+    assert second_note_resp.json()["visibility_level"] == "admin"
+
+    cleanup_resp = client.delete(f"/persons/{person_id}")
+    assert cleanup_resp.status_code == 200

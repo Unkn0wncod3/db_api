@@ -35,3 +35,12 @@ def visibility_clause_for_role(
 
 def cache_role_key(role: str) -> str:
     return role if role in (VISIBILITY_ADMIN, VISIBILITY_USER) else VISIBILITY_USER
+
+
+def inherit_visibility(parent_level: VisibilityLevel, requested: Optional[VisibilityLevel]) -> VisibilityLevel:
+    """
+    Ensures that child entities cannot be less restrictive than their parent.
+    """
+    if parent_level == VISIBILITY_ADMIN:
+        return VISIBILITY_ADMIN
+    return requested if requested in (VISIBILITY_ADMIN, VISIBILITY_USER) else VISIBILITY_USER

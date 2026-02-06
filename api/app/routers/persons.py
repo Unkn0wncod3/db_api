@@ -8,10 +8,21 @@ from ..schemas import PersonCreate, PersonUpdate
 from ..security import require_role
 from ..visibility import visibility_clause_for_role
 
+DEPENDENT_TABLES = ("notes", "person_profile_map", "activities")
+
+
 router = APIRouter(
     prefix="/persons",
     tags=["persons"],
 )
+
+
+def _propagate_person_visibility(cur, person_id: int, visibility_level: str) -> None:
+    for table in DEPENDENT_TABLES:
+        cur.execute(
+            f"UPDATE {table} SET visibility_level=%s WHERE person_id=%s;",
+            (visibility_level, person_id),
+        )
 
 
 @router.get("")
@@ -103,6 +114,8 @@ def update_person(person_id: int, payload: PersonUpdate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(f"UPDATE persons SET {set_sql} WHERE id=%(person_id)s RETURNING *;", fields)
         row = cur.fetchone()
+        if "visibility_level" in fields:
+            _propagate_person_visibility(cur, person_id, fields["visibility_level"])
         conn.commit()
     if not row:
         raise HTTPException(404, "Person not found")

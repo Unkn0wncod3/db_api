@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..db import get_connection
 from ..schemas import NoteCreate, NoteUpdate
 from ..security import require_role
-from ..visibility import visibility_clause_for_role
+from ..visibility import inherit_visibility, visibility_clause_for_role
 
 router = APIRouter(
     prefix="/notes",
@@ -110,13 +110,18 @@ def list_person_notes(person_id: int, current_user: Dict = Depends(require_role(
 @router.post("/by-person/{person_id}", status_code=201, dependencies=[Depends(require_role("admin"))])
 def add_person_note(person_id: int, payload: NoteCreate):
     with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (person_id,))
+        person = cur.fetchone()
+        if not person:
+            raise HTTPException(404, "Person not found")
+        note_visibility = inherit_visibility(person["visibility_level"], payload.visibility_level)
         cur.execute(
             """
             INSERT INTO notes (person_id, title, text, pinned, visibility_level)
             VALUES (%s, %s, %s, %s, %s)
             RETURNING *;
             """,
-            (person_id, payload.title, payload.text, payload.pinned, payload.visibility_level),
+            (person_id, payload.title, payload.text, payload.pinned, note_visibility),
         )
         row = cur.fetchone()
         conn.commit()
