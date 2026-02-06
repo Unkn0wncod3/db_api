@@ -27,66 +27,76 @@ TABLES: List[TableConfig] = [
     {
         "key": "users",
         "table": "users",
+        "alias": "u",
         "created_field": "created_at",
         "updated_field": "updated_at",
         "visibility_column": False,
         "recent": {
             "fields": ["id", "username", "role", "created_at", "updated_at"],
-            "order": "COALESCE(updated_at, created_at)",
+            "order": "COALESCE(u.updated_at, u.created_at)",
             "limit": 5,
         },
     },
     {
         "key": "persons",
         "table": "persons",
+        "alias": "p",
         "created_field": "created_at",
         "updated_field": "updated_at",
         "visibility_column": True,
         "recent": {
             "fields": ["id", "first_name", "last_name", "status", "created_at", "updated_at"],
-            "order": "COALESCE(updated_at, created_at)",
+            "order": "COALESCE(p.updated_at, p.created_at)",
             "limit": 5,
         },
     },
     {
         "key": "notes",
         "table": "notes",
+        "alias": "n",
         "created_field": "created_at",
         "updated_field": "updated_at",
         "visibility_column": True,
+        "joins": ["JOIN persons p ON p.id = n.person_id"],
+        "visibility_aliases": ["n", "p"],
         "recent": {
             "fields": ["id", "person_id", "title", "created_at", "updated_at"],
-            "order": "COALESCE(updated_at, created_at)",
+            "order": "COALESCE(n.updated_at, n.created_at)",
             "limit": 5,
         },
     },
     {
         "key": "profiles",
         "table": "profiles",
+        "alias": "pr",
         "created_field": "created_at",
         "updated_field": "updated_at",
         "visibility_column": True,
         "recent": {
             "fields": ["id", "platform_id", "username", "status", "created_at", "updated_at"],
-            "order": "COALESCE(updated_at, created_at)",
+            "order": "COALESCE(pr.updated_at, pr.created_at)",
             "limit": 5,
         },
     },
     {
         "key": "activities",
         "table": "activities",
+        "alias": "a",
         "created_field": "occurred_at",
         "updated_field": "updated_at",
         "visibility_column": True,
+        "joins": ["JOIN persons p ON p.id = a.person_id"],
+        "visibility_aliases": ["a", "p"],
         "recent": {
             "fields": ["id", "person_id", "activity_type", "occurred_at", "updated_at", "severity"],
-            "order": "COALESCE(updated_at, occurred_at)",
+            "order": "COALESCE(a.updated_at, a.occurred_at)",
             "limit": 5,
         },
     },
     {
         "key": "vehicles",
         "table": "vehicles",
+        "alias": "v",
         "created_field": "created_at",
         "updated_field": "updated_at",
         "visibility_column": True,
@@ -95,6 +105,7 @@ TABLES: List[TableConfig] = [
     {
         "key": "platforms",
         "table": "platforms",
+        "alias": "pf",
         "created_field": "created_at",
         "updated_field": "updated_at",
         "visibility_column": True,
@@ -117,21 +128,31 @@ def _build_counts_sql(config: TableConfig, role: str) -> tuple[str, List[Any]]:
     select_parts = ["COUNT(*) AS total"]
     created_field = config.get("created_field")
     updated_field = config.get("updated_field")
+    alias = config.get("alias", config["table"][0])
     if created_field:
-        select_parts.append(f"MAX({created_field}) AS last_created_at")
+        select_parts.append(f"MAX({alias}.{created_field}) AS last_created_at")
     else:
         select_parts.append("NULL AS last_created_at")
     if updated_field:
-        select_parts.append(f"MAX({updated_field}) AS last_updated_at")
+        select_parts.append(f"MAX({alias}.{updated_field}) AS last_updated_at")
     else:
         select_parts.append("NULL AS last_updated_at")
-    sql = f"SELECT {', '.join(select_parts)} FROM {config['table']}"
+    sql = f"SELECT {', '.join(select_parts)} FROM {config['table']} {alias}"
+    for join_clause in config.get("joins", []):
+        sql += f" {join_clause}"
     params: List[Any] = []
+    where_clauses: List[str] = []
     if config.get("visibility_column", True):
-        clause, clause_params = visibility_clause_for_role(role)
-        if clause:
-            sql += f" WHERE {clause}"
-            params.extend(clause_params)
+        visibility_aliases = config.get("visibility_aliases")
+        if not visibility_aliases:
+            visibility_aliases = [alias]
+        for vis_alias in visibility_aliases:
+            clause, clause_params = visibility_clause_for_role(role, alias=vis_alias)
+            if clause:
+                where_clauses.append(clause)
+                params.extend(clause_params)
+    if where_clauses:
+        sql += " WHERE " + " AND ".join(where_clauses)
     return f"{sql};", params
 
 
@@ -139,17 +160,34 @@ def _fetch_recent(cur, config: TableConfig, role: str) -> Optional[List[Dict[str
     recent_config = config.get("recent")
     if not recent_config:
         return None
-    fields = ", ".join(recent_config["fields"])
+    alias = config.get("alias", config["table"][0])
+    fields_list = []
+    for field in recent_config["fields"]:
+        if "." in field or "(" in field:
+            fields_list.append(field)
+        else:
+            fields_list.append(f"{alias}.{field}")
+    fields = ", ".join(fields_list)
     order = recent_config["order"]
     limit = recent_config.get("limit", 5)
-    sql = f"SELECT {fields} FROM {config['table']}"
+    sql = f"SELECT {fields} FROM {config['table']} {alias}"
+    for join_clause in config.get("joins", []):
+        sql += f" {join_clause}"
     params: List[Any] = []
     if config.get("visibility_column", True):
-        clause, clause_params = visibility_clause_for_role(role)
-        if clause:
-            sql += f" WHERE {clause}"
-            params.extend(clause_params)
-    sql += f" ORDER BY {order} DESC NULLS LAST LIMIT %s;"
+        visibility_aliases = config.get("visibility_aliases")
+        if not visibility_aliases:
+            visibility_aliases = [alias]
+        where_clauses: List[str] = []
+        for vis_alias in visibility_aliases:
+            clause, clause_params = visibility_clause_for_role(role, alias=vis_alias)
+            if clause:
+                where_clauses.append(clause)
+                params.extend(clause_params)
+        if where_clauses:
+            sql += " WHERE " + " AND ".join(where_clauses)
+    order_expr = order if "." in order or "(" in order else f"{alias}.{order}"
+    sql += f" ORDER BY {order_expr} DESC NULLS LAST LIMIT %s;"
     params.append(limit)
     cur.execute(sql, params)
     return cur.fetchall()
