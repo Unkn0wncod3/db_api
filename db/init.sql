@@ -222,105 +222,6 @@ BEFORE UPDATE ON vehicles
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- Einfache Benutzungstabelle
--- ============================================================
-CREATE TABLE IF NOT EXISTS usages (
-    id SERIAL PRIMARY KEY,
-    person_id   INT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
-    item        TEXT NOT NULL,          -- freier Name
-    usage_date  DATE NOT NULL DEFAULT CURRENT_DATE,
-    notes       TEXT DEFAULT 'N/A',
-
-    -- optionale Details
-    duration_min INT,
-    location     TEXT,
-    cost_amount  NUMERIC(12,2),
-    currency     TEXT DEFAULT 'EUR',
-    metadata     JSONB DEFAULT '{}'::jsonb,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
-);
-
-CREATE INDEX IF NOT EXISTS idx_usages_person_date
-  ON usages (person_id, usage_date DESC);
-CREATE INDEX IF NOT EXISTS idx_usages_metadata_gin
-  ON usages USING GIN (metadata);
-
--- ============================================================
--- Spiele
--- ============================================================
-CREATE TABLE IF NOT EXISTS games (
-    id SERIAL PRIMARY KEY,
-    name        TEXT NOT NULL,
-    publisher   TEXT,
-    genre       TEXT,
-    release_year INT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_games_name
-  ON games (LOWER(name));
-
--- Verbindung zwischen Plattform-Profilen und einem Spiel
-CREATE TABLE IF NOT EXISTS game_profiles (
-    id SERIAL PRIMARY KEY,
-    profile_id   INT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    game_id      INT NOT NULL REFERENCES games(id)     ON DELETE CASCADE,
-    in_game_name TEXT,
-    level        INT DEFAULT 0,
-    rank         TEXT,
-    hours_played INT DEFAULT 0,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata     JSONB DEFAULT '{}'::jsonb,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_game_profiles_unique
-  ON game_profiles (profile_id, game_id);
-
--- ============================================================
--- Communities (Server/Foren/Clans)
--- ============================================================
-CREATE TABLE IF NOT EXISTS communities (
-    id SERIAL PRIMARY KEY,
-    platform_id  INT NOT NULL REFERENCES platforms(id) ON DELETE CASCADE,
-    name         TEXT NOT NULL,
-    external_id  TEXT,
-    url          TEXT,
-    type         TEXT,                 -- guild|forum|clan|group|other
-    member_count INT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ,
-    metadata     JSONB DEFAULT '{}'::jsonb,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_communities_platform_external
-  ON communities (platform_id, external_id);
-CREATE INDEX IF NOT EXISTS idx_communities_type
-  ON communities (type);
-CREATE TRIGGER trg_communities_updated
-BEFORE UPDATE ON communities
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- Mitgliedschaften von Profilen in Communities
-CREATE TABLE IF NOT EXISTS community_memberships (
-    id SERIAL PRIMARY KEY,
-    profile_id    INT NOT NULL REFERENCES profiles(id)    ON DELETE CASCADE,
-    community_id  INT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
-    role          TEXT DEFAULT 'member', -- member|mod|admin|owner ...
-    nickname      TEXT,
-    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
-    joined_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    left_at       TIMESTAMPTZ,
-    metadata      JSONB DEFAULT '{}'::jsonb,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_membership_unique
-  ON community_memberships (profile_id, community_id);
-
--- ============================================================
 -- Aktivitäten / Verlauf
 -- ============================================================
 CREATE TABLE IF NOT EXISTS activities (
@@ -332,7 +233,6 @@ CREATE TABLE IF NOT EXISTS activities (
     -- optionale Targets
     vehicle_id    INT REFERENCES vehicles(id)    ON DELETE SET NULL,
     profile_id    INT REFERENCES profiles(id)    ON DELETE SET NULL,
-    community_id  INT REFERENCES communities(id) ON DELETE SET NULL,
 
     item          TEXT,
     notes         TEXT,
@@ -350,7 +250,7 @@ CREATE TABLE IF NOT EXISTS activities (
 
     -- Mindestens EIN Target-Feld sollte befüllt sein
     CONSTRAINT chk_activities_target CHECK (
-        vehicle_id IS NOT NULL OR profile_id IS NOT NULL OR community_id IS NOT NULL OR item IS NOT NULL
+        vehicle_id IS NOT NULL OR profile_id IS NOT NULL OR item IS NOT NULL
     )
 );
 

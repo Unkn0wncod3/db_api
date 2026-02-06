@@ -82,8 +82,8 @@ def get_activity(activity_id: int, current_user: Dict[str, Any] = Depends(requir
 @router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_activity(payload: ActivityCreate):
     data = payload.model_dump()
-    if not any([data.get("vehicle_id"), data.get("profile_id"), data.get("community_id"), data.get("item")]):
-        raise HTTPException(400, "At least one of vehicle_id, profile_id, community_id or item must be provided.")
+    if not any([data.get("vehicle_id"), data.get("profile_id"), data.get("item")]):
+        raise HTTPException(400, "At least one of vehicle_id, profile_id or item must be provided.")
 
     if data.get("details") is not None:
         data["details"] = Jsonb(data["details"])
@@ -92,10 +92,10 @@ def create_activity(payload: ActivityCreate):
         cur.execute(
             """
             INSERT INTO activities (
-                person_id, activity_type, occurred_at, vehicle_id, profile_id, community_id,
+                person_id, activity_type, occurred_at, vehicle_id, profile_id,
                 item, notes, details, severity, source, ip_address, user_agent, geo_location, created_by, visibility_level
             ) VALUES (
-                %(person_id)s, %(activity_type)s, %(occurred_at)s, %(vehicle_id)s, %(profile_id)s, %(community_id)s,
+                %(person_id)s, %(activity_type)s, %(occurred_at)s, %(vehicle_id)s, %(profile_id)s,
                 %(item)s, %(notes)s, %(details)s, %(severity)s, %(source)s, %(ip_address)s, %(user_agent)s, %(geo_location)s, %(created_by)s, %(visibility_level)s
             ) RETURNING *;
             """,

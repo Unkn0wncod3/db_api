@@ -80,48 +80,6 @@ INSERT INTO notes (person_id, title, text)
 SELECT id, 'Follow-up', 'Ruft nächste Woche an.'
 FROM persons WHERE email='alice@example.com';
 
--- Games
-INSERT INTO games (name, publisher, genre, release_year)
-VALUES
-('Counter-Strike 2', 'Valve', 'FPS', 2023),
-('Dota 2', 'Valve', 'MOBA', 2013)
-ON CONFLICT (LOWER(name)) DO NOTHING;
-
--- Game Profiles (John spielt CS2)
-INSERT INTO game_profiles (profile_id, game_id, in_game_name, level, rank, hours_played)
-SELECT prof.id, g.id, 'johnCS', 27, 'Gold Nova', 240
-FROM profiles prof, games g
-WHERE prof.username='john_steam' AND g.name='Counter-Strike 2'
-ON CONFLICT DO NOTHING;
-
--- Communities
-INSERT INTO communities (platform_id, name, external_id, url, type, member_count)
-SELECT p.id, 'My Discord Server', '9876543210', 'https://discord.gg/example', 'guild', 1200
-FROM platforms p WHERE p.name='Discord'
-ON CONFLICT DO NOTHING;
-
--- Memberships
-INSERT INTO community_memberships (profile_id, community_id, role, nickname)
-SELECT prof.id, comm.id, 'member', 'JD'
-FROM profiles prof, communities comm
-WHERE prof.username='john_d' AND comm.name='My Discord Server'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO community_memberships (profile_id, community_id, role)
-SELECT prof.id, comm.id, 'mod'
-FROM profiles prof, communities comm
-WHERE prof.username='bob_discord' AND comm.name='My Discord Server'
-ON CONFLICT DO NOTHING;
-
--- Usages (Beispielverwendungen)
-INSERT INTO usages (person_id, item, usage_date, notes, duration_min, location, cost_amount)
-SELECT per.id, 'Car XY', CURRENT_DATE, 'Kurzstrecke', 25, 'Berlin', 7.50
-FROM persons per WHERE per.email='john.doe@example.com';
-
-INSERT INTO usages (person_id, item, usage_date, notes, duration_min, location)
-SELECT per.id, 'E-Van 1', CURRENT_DATE - INTERVAL '1 day', 'Lieferung Innenstadt', 90, 'Karlsruhe'
-FROM persons per WHERE per.email='bob.meyer@example.com';
-
 -- Aktivitäten
 -- 1) John fährt Car XY
 INSERT INTO activities (person_id, activity_type, vehicle_id, item, notes, details, severity, source, geo_location, ip_address, user_agent, created_by)
@@ -131,15 +89,7 @@ SELECT per.id, 'drive', v.id, v.label, 'Testfahrt',
 FROM persons per, vehicles v
 WHERE per.email='john.doe@example.com' AND v.label='Car XY';
 
--- 2) John joint Discord-Server
-INSERT INTO activities (person_id, activity_type, profile_id, community_id, notes, details, source)
-SELECT per.id, 'join_community', prof.id, comm.id, 'Joined via invite',
-       jsonb_build_object('invite_code', 'abcd1234'),
-       'api'
-FROM persons per, profiles prof, communities comm
-WHERE per.email='john.doe@example.com' AND prof.username='john_d' AND comm.name='My Discord Server';
-
--- 3) John Steam Login
+-- 2) John Steam Login
 INSERT INTO activities (person_id, activity_type, profile_id, notes, details, ip_address, user_agent, source)
 SELECT per.id, 'login', prof.id, 'Login from DE',
        jsonb_build_object('ip', '203.0.113.10', 'ua', 'Chrome/Windows'),
@@ -147,14 +97,14 @@ SELECT per.id, 'login', prof.id, 'Login from DE',
 FROM persons per, profiles prof
 WHERE per.email='john.doe@example.com' AND prof.username='john_steam';
 
--- 4) Freies Item-Event (Upload)
+-- 3) Freies Item-Event (Upload)
 INSERT INTO activities (person_id, activity_type, item, notes, details, severity, source)
 SELECT per.id, 'custom', 'Uploaded PDF Document', 'Manual upload',
        jsonb_build_object('file_id', 'doc_001', 'size_kb', 842),
        'info', 'manual'
 FROM persons per WHERE per.email='john.doe@example.com';
 
--- 5) Bob postet auf Discord
+-- 4) Bob postet auf Discord
 INSERT INTO activities (person_id, activity_type, profile_id, item, notes, details, source, geo_location)
 SELECT per.id, 'post', prof.id, '#general', 'Willkommenspost',
        jsonb_build_object('message_id','m_1001','length',120),
@@ -162,7 +112,7 @@ SELECT per.id, 'post', prof.id, '#general', 'Willkommenspost',
 FROM persons per, profiles prof
 WHERE per.email='bob.meyer@example.com' AND prof.username='bob_discord';
 
--- 6) Alice X-Post
+-- 5) Alice X-Post
 INSERT INTO activities (person_id, activity_type, profile_id, item, details, source)
 SELECT per.id, 'post', prof.id, '@alice_x',
        jsonb_build_object('tweet_id','t_42','likes',10,'retweets',2),

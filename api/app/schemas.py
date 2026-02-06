@@ -156,7 +156,6 @@ class ActivityCreate(BaseModel):
     occurred_at: Optional[datetime] = None
     vehicle_id: Optional[int] = None
     profile_id: Optional[int] = None
-    community_id: Optional[int] = None
     item: Optional[str] = None
     notes: Optional[str] = None
     details: Optional[Dict[str, Any]] = Field(default_factory=dict)
@@ -174,7 +173,6 @@ class ActivityUpdate(BaseModel):
     occurred_at: Optional[datetime] = None
     vehicle_id: Optional[int] = None
     profile_id: Optional[int] = None
-    community_id: Optional[int] = None
     item: Optional[str] = None
     notes: Optional[str] = None
     details: Optional[Dict[str, Any]] = None

@@ -8,14 +8,9 @@ DROP VIEW IF EXISTS v_person_profiles      CASCADE;
 DROP VIEW IF EXISTS v_person_summary       CASCADE;
 
 -- 2) Tables
-DROP TABLE IF EXISTS community_memberships CASCADE;
-DROP TABLE IF EXISTS game_profiles         CASCADE;
-DROP TABLE IF EXISTS usages                CASCADE;
 DROP TABLE IF EXISTS activities            CASCADE;
 DROP TABLE IF EXISTS notes                 CASCADE;
 DROP TABLE IF EXISTS person_profile_map    CASCADE;
-DROP TABLE IF EXISTS communities           CASCADE;
-DROP TABLE IF EXISTS games                 CASCADE;
 DROP TABLE IF EXISTS vehicles              CASCADE;
 DROP TABLE IF EXISTS profiles              CASCADE;
 DROP TABLE IF EXISTS platforms             CASCADE;
