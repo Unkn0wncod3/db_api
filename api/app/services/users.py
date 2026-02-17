@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException, status
 from psycopg.errors import UniqueViolation, UndefinedTable
+from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..security import hash_password
@@ -62,6 +63,8 @@ def create_user(
 ) -> Dict:
     password_hash = hash_password(password)
     preferences_payload = preferences or {}
+    if preferences_payload is not None:
+        preferences_payload = Jsonb(preferences_payload)
     with get_connection() as conn, conn.cursor() as cur:
         try:
             cur.execute(
@@ -90,7 +93,8 @@ def update_user(user_id: int, fields: Dict[str, Any]) -> Dict:
             updates[key] = fields[key]
 
     if "preferences" in fields:
-        updates["preferences"] = fields["preferences"] or {}
+        pref_value = fields["preferences"] or {}
+        updates["preferences"] = Jsonb(pref_value)
 
     if "password" in fields:
         updates["password_hash"] = hash_password(fields["password"])
