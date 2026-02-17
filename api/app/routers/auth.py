@@ -21,6 +21,8 @@ def login(payload: AuthLoginRequest):
         username=db_user["username"],
         role=db_user["role"],
         is_active=db_user["is_active"],
+        profile_picture_url=db_user.get("profile_picture_url"),
+        preferences=db_user.get("preferences") or {},
         created_at=db_user["created_at"],
         updated_at=db_user.get("updated_at"),
     )

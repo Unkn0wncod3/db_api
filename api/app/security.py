@@ -91,7 +91,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer
 
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT id, username, role, is_active, created_at, updated_at FROM users WHERE id=%s;",
+            "SELECT id, username, role, is_active, profile_picture_url, preferences, created_at, updated_at FROM users WHERE id=%s;",
             (token_data["sub"],),
         )
         user = cur.fetchone()
@@ -100,6 +100,8 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
     if user["role"] != token_data.get("role"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token role mismatch")
+    if user.get("preferences") is None:
+        user["preferences"] = {}
     return user
 
 
