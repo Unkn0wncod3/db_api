@@ -192,16 +192,16 @@ class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
     role: Role = "user"
     profile_picture_url: Optional[str] = Field(default=None, max_length=1024)
-    preferences: Dict[str, Any] = Field(default_factory=dict)
+    preferences: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class UserUpdate(BaseModel):
     username: Optional[str] = Field(default=None, min_length=3, max_length=64)
-    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+    password: Optional[str] = Field(default=None, min_length=1, max_length=128)
     role: Optional[Role] = None
     is_active: Optional[bool] = None
     profile_picture_url: Optional[str] = Field(default=None, max_length=1024)
