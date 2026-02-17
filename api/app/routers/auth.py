@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Dict
 
-from ..schemas import AuthLoginRequest, AuthLoginResponse, UserResponse
-from ..security import create_access_token, verify_password
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from ..schemas import AuthLoginRequest, AuthLoginResponse, UserResponse, UserUpdate
+from ..security import create_access_token, get_current_user, verify_password
 from ..services import users as user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,3 +29,26 @@ def login(payload: AuthLoginRequest):
         updated_at=db_user.get("updated_at"),
     )
     return AuthLoginResponse(access_token=token, user=user_payload)
+
+
+@router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
+def read_current_user(current_user: Dict = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
+def update_current_user(payload: UserUpdate, current_user: Dict = Depends(get_current_user)):
+    allowed_fields = {}
+    if payload.username is not None:
+        allowed_fields["username"] = payload.username
+    if payload.password is not None:
+        allowed_fields["password"] = payload.password
+    if payload.profile_picture_url is not None:
+        allowed_fields["profile_picture_url"] = payload.profile_picture_url
+    if payload.preferences is not None:
+        allowed_fields["preferences"] = payload.preferences
+
+    if not allowed_fields:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes supplied")
+
+    return user_service.update_user(current_user["id"], allowed_fields)
