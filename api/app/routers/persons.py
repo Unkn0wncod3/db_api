@@ -1,12 +1,13 @@
 from typing import Optional, Any, List, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
-from ..schemas import PersonCreate, PersonUpdate
+from ..schemas import PersonCreate, PersonDossierResponse, PersonUpdate
 from ..security import require_role
+from ..services import dossiers as dossier_service
 from ..visibility import visibility_clause_for_role
 
 DEPENDENT_TABLES = ("notes", "person_profile_map", "activities")
@@ -132,3 +133,51 @@ def delete_person(person_id: int):
     if not row:
         raise HTTPException(404, "Person not found")
     return {"deleted": row["id"]}
+
+
+@router.get("/{person_id}/dossier", response_model=PersonDossierResponse)
+def get_person_dossier(
+    person_id: int,
+    request: Request,
+    response: Response,
+    current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES)),
+    profiles_limit: int = Query(5, ge=0, le=50),
+    notes_limit: int = Query(5, ge=0, le=50),
+    activities_limit: int = Query(5, ge=0, le=50),
+):
+    dossier, etag = dossier_service.fetch_person_dossier(
+        person_id,
+        current_user=current_user,
+        profile_limit=profiles_limit,
+        note_limit=notes_limit,
+        activity_limit=activities_limit,
+    )
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED)
+    response.headers["ETag"] = etag
+    return dossier
+
+
+@router.get("/{person_id}/dossier.pdf")
+def get_person_dossier_pdf(
+    person_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES)),
+    profiles_limit: int = Query(5, ge=0, le=50),
+    notes_limit: int = Query(5, ge=0, le=50),
+    activities_limit: int = Query(5, ge=0, le=50),
+):
+    dossier, etag = dossier_service.fetch_person_dossier(
+        person_id,
+        current_user=current_user,
+        profile_limit=profiles_limit,
+        note_limit=notes_limit,
+        activity_limit=activities_limit,
+    )
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED)
+    pdf_bytes = dossier_service.render_dossier_pdf(dossier)
+    pdf_response = Response(content=pdf_bytes, media_type="application/pdf")
+    pdf_response.headers["Content-Disposition"] = f'attachment; filename="person_{person_id}_dossier.pdf"'
+    pdf_response.headers["ETag"] = etag
+    return pdf_response

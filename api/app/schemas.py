@@ -234,3 +234,118 @@ class AuthLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# -------- Person Dossier --------
+class PersonDossierProfile(BaseModel):
+    id: int
+    platform_id: Optional[int] = None
+    platform_name: Optional[str] = None
+    username: str
+    display_name: Optional[str] = None
+    status: Optional[str] = None
+    visibility_level: VisibilityLevel
+    link_visibility_level: VisibilityLevel
+    linked_at: datetime
+    last_seen_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class PersonDossierNote(BaseModel):
+    id: int
+    title: Optional[str] = None
+    text: str
+    pinned: bool
+    visibility_level: VisibilityLevel
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class PersonDossierActivity(BaseModel):
+    id: int
+    person_id: int
+    activity_type: str
+    occurred_at: datetime
+    notes: Optional[str] = None
+    severity: Optional[str] = None
+    source: Optional[str] = None
+    visibility_level: VisibilityLevel
+    created_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class PersonDossierRelations(BaseModel):
+    profiles: List[PersonDossierProfile]
+    notes: List[PersonDossierNote]
+    activities: List[PersonDossierActivity]
+
+
+class PersonDossierStatsSection(BaseModel):
+    total: int
+    last_updated_at: Optional[datetime] = None
+
+
+class PersonDossierStats(BaseModel):
+    profiles: PersonDossierStatsSection
+    notes: PersonDossierStatsSection
+    activities: PersonDossierStatsSection
+
+
+class PersonDossierPerson(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    city: Optional[str] = None
+    region_state: Optional[str] = None
+    country: Optional[str] = None
+    status: Optional[str] = None
+    risk_level: Optional[str] = None
+    tags: List[Any] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    visibility_level: VisibilityLevel
+    visibility_scope: List[VisibilityLevel]
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
+    nationality: Optional[str] = None
+    occupation: Optional[str] = None
+
+
+class PersonDossierActivitySummary(BaseModel):
+    id: int
+    activity_type: str
+    occurred_at: datetime
+    visibility_level: VisibilityLevel
+    notes: Optional[str] = None
+    severity: Optional[str] = None
+
+
+class PersonDossierAudit(BaseModel):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    last_activity: Optional[PersonDossierActivitySummary] = None
+
+
+class PersonDossierMetaLimits(BaseModel):
+    profiles: int
+    notes: int
+    activities: int
+
+
+class PersonDossierMeta(BaseModel):
+    can_view_admin_sections: bool
+    limits: PersonDossierMetaLimits
+
+
+class PersonDossierResponse(BaseModel):
+    person: PersonDossierPerson
+    relations: PersonDossierRelations
+    stats: PersonDossierStats
+    audit: PersonDossierAudit
+    meta: PersonDossierMeta
