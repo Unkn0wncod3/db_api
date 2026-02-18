@@ -317,9 +317,18 @@ def render_dossier_pdf(dossier: Dict[str, Any], brand_label: str = "DB API") -> 
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 10, f"{person['first_name']} {person['last_name']} (#{person['id']})", ln=True)
     pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 6, f"Status: {person.get('status') or 'n/a'} | Risk: {person.get('risk_level') or 'n/a'}")
-    pdf.multi_cell(0, 6, f"Email: {person.get('email') or 'n/a'}")
-    pdf.multi_cell(0, 6, f"Location: {person.get('city') or ''} {person.get('region_state') or ''} {person.get('country') or ''}".strip())
+    content_width = pdf.w - 2 * pdf.l_margin
+
+    def write_text_line(text: str) -> None:
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(content_width, 6, text)
+
+    write_text_line(f"Status: {person.get('status') or 'n/a'} | Risk: {person.get('risk_level') or 'n/a'}")
+    write_text_line(f"Email: {person.get('email') or 'n/a'}")
+    write_text_line(
+        f"Location: {person.get('city') or ''} {person.get('region_state') or ''} {person.get('country') or ''}".strip()
+        or "Location: n/a"
+    )
     pdf.ln(4)
 
     def section(title: str):
@@ -333,11 +342,9 @@ def render_dossier_pdf(dossier: Dict[str, Any], brand_label: str = "DB API") -> 
         pdf.cell(0, 6, "No profiles within visibility scope.", ln=True)
     else:
         for profile in profiles:
-            pdf.multi_cell(
-                0,
-                6,
+            write_text_line(
                 f"- {profile.get('platform_name') or 'Platform'} / {profile.get('username')} "
-                f"(status: {profile.get('status')})",
+                f"(status: {profile.get('status')})"
             )
     pdf.ln(2)
 
@@ -348,7 +355,7 @@ def render_dossier_pdf(dossier: Dict[str, Any], brand_label: str = "DB API") -> 
     else:
         for note in notes:
             title = note.get("title") or "Untitled"
-            pdf.multi_cell(0, 6, f"- {title}: {note.get('text')[:140]}".strip())
+            write_text_line(f"- {title}: {note.get('text')[:140]}".strip())
     pdf.ln(2)
 
     section("Recent Activities")
@@ -359,19 +366,15 @@ def render_dossier_pdf(dossier: Dict[str, Any], brand_label: str = "DB API") -> 
         for activity in activities:
             occurred = activity.get("occurred_at")
             occurred_str = occurred.isoformat() if isinstance(occurred, datetime) else str(occurred)
-            pdf.multi_cell(
-                0,
-                6,
-                f"- {occurred_str}: {activity.get('activity_type')} ({activity.get('severity') or 'n/a'})",
+            write_text_line(
+                f"- {occurred_str}: {activity.get('activity_type')} ({activity.get('severity') or 'n/a'})"
             )
 
     pdf.ln(4)
     section("Stats")
     stats = dossier["stats"]
-    pdf.multi_cell(
-        0,
-        6,
-        f"Profiles: {stats['profiles']['total']} | Notes: {stats['notes']['total']} | Activities: {stats['activities']['total']}",
+    write_text_line(
+        f"Profiles: {stats['profiles']['total']} | Notes: {stats['notes']['total']} | Activities: {stats['activities']['total']}"
     )
 
     pdf_bytes = pdf.output(dest="S").encode("latin-1")
