@@ -3,6 +3,7 @@ from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import NoteCreate, NoteUpdate
 from ..security import require_role
 from ..visibility import inherit_visibility, visibility_clause_for_role
@@ -26,7 +27,7 @@ def _append_visibility_filters(sql: str, params: list, role: str) -> tuple[str, 
 
 
 @router.get("")
-def list_notes(current_user: Dict = Depends(require_role("user", "admin"))):
+def list_notes(current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = """
         SELECT n.*
@@ -43,7 +44,7 @@ def list_notes(current_user: Dict = Depends(require_role("user", "admin"))):
 
 
 @router.get("/{note_id}")
-def get_note(note_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
+def get_note(note_id: int, current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = """
         SELECT n.*
@@ -60,7 +61,7 @@ def get_note(note_id: int, current_user: Dict = Depends(require_role("user", "ad
     return row
 
 
-@router.patch("/{note_id}", dependencies=[Depends(require_role("admin"))])
+@router.patch("/{note_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def update_note(note_id: int, payload: NoteUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -79,7 +80,7 @@ def update_note(note_id: int, payload: NoteUpdate):
     return row
 
 
-@router.delete("/{note_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{note_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def delete_note(note_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM notes WHERE id=%s RETURNING id;", (note_id,))
@@ -91,7 +92,7 @@ def delete_note(note_id: int):
 
 
 @router.get("/by-person/{person_id}")
-def list_person_notes(person_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
+def list_person_notes(person_id: int, current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = """
         SELECT n.*
@@ -107,7 +108,7 @@ def list_person_notes(person_id: int, current_user: Dict = Depends(require_role(
     return {"items": rows}
 
 
-@router.post("/by-person/{person_id}", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("/by-person/{person_id}", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def add_person_note(person_id: int, payload: NoteCreate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (person_id,))

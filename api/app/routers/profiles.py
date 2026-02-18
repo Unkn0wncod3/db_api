@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import ProfileCreate, ProfileUpdate
 from ..security import require_role
 from ..visibility import visibility_clause_for_role
@@ -20,7 +21,7 @@ def list_profiles(
     username: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    current_user: Dict[str, Any] = Depends(require_role("user", "admin")),
+    current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES)),
 ):
     sql = "SELECT * FROM profiles pr WHERE 1=1"
     params: List[Any] = []
@@ -43,7 +44,7 @@ def list_profiles(
 
 
 @router.get("/{profile_id}")
-def get_profile(profile_id: int, current_user: Dict[str, Any] = Depends(require_role("user", "admin"))):
+def get_profile(profile_id: int, current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = "SELECT * FROM profiles pr WHERE pr.id=%s"
         params = [profile_id]
@@ -57,7 +58,7 @@ def get_profile(profile_id: int, current_user: Dict[str, Any] = Depends(require_
         raise HTTPException(404, "Profile not found")
     return row
 
-@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def create_profile(payload: ProfileCreate):
     data = payload.model_dump()
     if data.get("metadata") is not None:
@@ -81,7 +82,7 @@ def create_profile(payload: ProfileCreate):
     return row
 
 
-@router.patch("/{profile_id}", dependencies=[Depends(require_role("admin"))])
+@router.patch("/{profile_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def update_profile(profile_id: int, payload: ProfileUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -104,7 +105,7 @@ def update_profile(profile_id: int, payload: ProfileUpdate):
     return row
 
 
-@router.delete("/{profile_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{profile_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def delete_profile(profile_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM profiles WHERE id=%s RETURNING id;", (profile_id,))

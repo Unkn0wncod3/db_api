@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import PersonCreate, PersonUpdate
 from ..security import require_role
 from ..visibility import visibility_clause_for_role
@@ -31,7 +32,7 @@ def list_persons(
     tag: Optional[str] = Query(default=None, description="Filter by tag"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    current_user: Dict[str, Any] = Depends(require_role("user", "admin")),
+    current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES)),
 ):
     sql = """
     SELECT p.id, p.first_name, p.last_name, p.email, p.status, p.tags, p.created_at, p.updated_at, p.visibility_level
@@ -59,7 +60,7 @@ def list_persons(
 
 
 @router.get("/{person_id}")
-def get_person(person_id: int, current_user: Dict[str, Any] = Depends(require_role("user", "admin"))):
+def get_person(person_id: int, current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = "SELECT * FROM persons p WHERE p.id=%s"
         params: List[Any] = [person_id]
@@ -74,7 +75,7 @@ def get_person(person_id: int, current_user: Dict[str, Any] = Depends(require_ro
     return row
 
 
-@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def create_person(payload: PersonCreate):
     with get_connection() as conn, conn.cursor() as cur:
         data = payload.model_dump()
@@ -100,7 +101,7 @@ def create_person(payload: PersonCreate):
     return row
 
 
-@router.patch("/{person_id}", dependencies=[Depends(require_role("admin"))])
+@router.patch("/{person_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def update_person(person_id: int, payload: PersonUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -122,7 +123,7 @@ def update_person(person_id: int, payload: PersonUpdate):
     return row
 
 
-@router.delete("/{person_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{person_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def delete_person(person_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM persons WHERE id=%s RETURNING id;", (person_id,))

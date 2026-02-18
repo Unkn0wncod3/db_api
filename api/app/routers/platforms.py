@@ -1,7 +1,9 @@
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException
+
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import PlatformCreate, PlatformUpdate
 from ..security import require_role
 from ..visibility import visibility_clause_for_role
@@ -12,7 +14,7 @@ router = APIRouter(
 )
 
 @router.get("")
-def list_platforms(current_user: Dict = Depends(require_role("user", "admin"))):
+def list_platforms(current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = "SELECT * FROM platforms p WHERE 1=1"
         params = []
@@ -26,7 +28,7 @@ def list_platforms(current_user: Dict = Depends(require_role("user", "admin"))):
     return {"items": rows}
 
 @router.get("/{platform_id}")
-def get_platform(platform_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
+def get_platform(platform_id: int, current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = "SELECT * FROM platforms p WHERE p.id=%s"
         params = [platform_id]
@@ -40,7 +42,7 @@ def get_platform(platform_id: int, current_user: Dict = Depends(require_role("us
         raise HTTPException(404, "Platform not found")
     return row
 
-@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def create_platform(payload: PlatformCreate):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -62,7 +64,7 @@ def create_platform(payload: PlatformCreate):
         conn.commit()
     return row
 
-@router.patch("/{platform_id}", dependencies=[Depends(require_role("admin"))])
+@router.patch("/{platform_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def update_platform(platform_id: int, payload: PlatformUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -80,7 +82,7 @@ def update_platform(platform_id: int, payload: PlatformUpdate):
         raise HTTPException(404, "Platform not found")
     return row
 
-@router.delete("/{platform_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{platform_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def delete_platform(platform_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM platforms WHERE id=%s RETURNING id;", (platform_id,))

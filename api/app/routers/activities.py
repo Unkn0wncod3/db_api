@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import ActivityCreate, ActivityUpdate
 from ..security import require_role
 from ..visibility import inherit_visibility, visibility_clause_for_role
@@ -21,7 +22,7 @@ def list_activities(
     since: Optional[str] = None,  # ISO-String; DB TIMESTAMPTZ cast
     limit: int = 100,
     offset: int = 0,
-    current_user: Dict[str, Any] = Depends(require_role("user", "admin")),
+    current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES)),
 ):
     sql = """
     SELECT a.*
@@ -56,7 +57,7 @@ def list_activities(
 
 
 @router.get("/{activity_id}")
-def get_activity(activity_id: int, current_user: Dict[str, Any] = Depends(require_role("user", "admin"))):
+def get_activity(activity_id: int, current_user: Dict[str, Any] = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = """
         SELECT a.*
@@ -79,7 +80,7 @@ def get_activity(activity_id: int, current_user: Dict[str, Any] = Depends(requir
         raise HTTPException(404, "Activity not found")
     return row
 
-@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def create_activity(payload: ActivityCreate):
     data = payload.model_dump()
     if not any([data.get("vehicle_id"), data.get("profile_id"), data.get("item")]):
@@ -111,7 +112,7 @@ def create_activity(payload: ActivityCreate):
     return row
 
 
-@router.patch("/{activity_id}", dependencies=[Depends(require_role("admin"))])
+@router.patch("/{activity_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def update_activity(activity_id: int, payload: ActivityUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -134,7 +135,7 @@ def update_activity(activity_id: int, payload: ActivityUpdate):
     return row
 
 
-@router.delete("/{activity_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{activity_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def delete_activity(activity_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM activities WHERE id=%s RETURNING id;", (activity_id,))

@@ -38,6 +38,10 @@ OpenAPI Docs: http://localhost:8000/docs
 ## Authentication & Roles
 
 - Set `AUTH_SECRET_KEY`, `DEFAULT_ADMIN_USERNAME`, and `DEFAULT_ADMIN_PASSWORD` in `.env` before starting the API.  
-- On the first startup the service creates the default admin if no admin exists; change the generated password afterwards via the `/users` endpoints.  
+- On the first startup the service creates the default **head admin** if none exists; change the generated password afterwards via the `/users` endpoints.  
 - Obtain an access token via `POST /auth/login` and send it as `Authorization: Bearer <token>` on subsequent requests.  
-- Role rules: `user` may call only `GET` endpoints, while `admin` can also use every mutating (`POST/PATCH/DELETE`) endpoint plus the `/users` management routes.
+- Role rules:  
+  - `head_admin`: full control including assigning other admin/head-admin users.  
+  - `admin`: can perform every operation (read/write/delete, manage users) except granting admin/head-admin roles.  
+  - `editor`: may read everything that is not `admin`-only, create/update non-user records, but cannot delete entries or manage users.  
+  - `user`: read-only access to entries with `user` visibility.

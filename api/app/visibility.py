@@ -4,10 +4,11 @@ from typing import Literal
 VisibilityLevel = Literal["admin", "user"]
 VISIBILITY_ADMIN: VisibilityLevel = "admin"
 VISIBILITY_USER: VisibilityLevel = "user"
+_ADMIN_VISIBILITY_ROLES = {"head_admin", "admin"}
 
 
 def is_admin_role(role: str) -> bool:
-    return role == VISIBILITY_ADMIN
+    return role in _ADMIN_VISIBILITY_ROLES
 
 
 def allowed_visibility_levels(role: str) -> Sequence[VisibilityLevel]:
@@ -34,7 +35,7 @@ def visibility_clause_for_role(
 
 
 def cache_role_key(role: str) -> str:
-    return role if role in (VISIBILITY_ADMIN, VISIBILITY_USER) else VISIBILITY_USER
+    return VISIBILITY_ADMIN if role in _ADMIN_VISIBILITY_ROLES else VISIBILITY_USER
 
 
 def inherit_visibility(parent_level: VisibilityLevel, requested: Optional[VisibilityLevel]) -> VisibilityLevel:

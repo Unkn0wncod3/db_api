@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from fastapi import APIRouter, Depends, Query
 
 from ..db import get_connection
+from ..roles import READ_ROLES
 from ..security import require_role
 from ..visibility import cache_role_key, visibility_clause_for_role
 
@@ -231,7 +232,7 @@ def _make_response(payload: Dict[str, Any], generated_at: datetime, expires_at: 
 @router.get("/overview")
 def stats_overview(
     force_refresh: bool = Query(False, description="Skip cached value and recompute instantly."),
-    current_user: Dict = Depends(require_role("user", "admin")),
+    current_user: Dict = Depends(require_role(*READ_ROLES)),
 ):
     global _cache_payload, _cache_generated_at, _cache_expires_at
 

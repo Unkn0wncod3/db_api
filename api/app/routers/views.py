@@ -2,7 +2,9 @@ from typing import Dict
 
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.encoders import jsonable_encoder
+
 from ..db import get_connection as _get_connection
+from ..roles import READ_ROLES
 from ..security import require_role
 from ..visibility import visibility_clause_for_role
 
@@ -20,7 +22,7 @@ def view_person_timeline(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     conn = Depends(get_conn),
-    current_user: Dict = Depends(require_role("user", "admin")),
+    current_user: Dict = Depends(require_role(*READ_ROLES)),
 ):
     with conn.cursor() as cur:
         sql = """
@@ -51,7 +53,7 @@ def view_person_timeline(
 def view_person_profiles(
     person_id: int,
     conn = Depends(get_conn),
-    current_user: Dict = Depends(require_role("user", "admin")),
+    current_user: Dict = Depends(require_role(*READ_ROLES)),
     ):
     with conn.cursor() as cur:
         sql = """
@@ -80,7 +82,7 @@ def view_person_summary(
     limit: int = 100, 
     offset: int = 0,
     conn = Depends(get_conn),
-    current_user: Dict = Depends(require_role("user", "admin")),
+    current_user: Dict = Depends(require_role(*READ_ROLES)),
     ):
     with conn.cursor() as cur:
         sql = """

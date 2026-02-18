@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('head_admin', 'admin', 'editor', 'user')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     profile_picture_url TEXT,
     preferences JSONB NOT NULL DEFAULT '{}'::jsonb,

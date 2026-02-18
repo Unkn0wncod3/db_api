@@ -185,7 +185,7 @@ class ActivityUpdate(BaseModel):
     visibility_level: Optional[VisibilityLevel] = None
 
 # -------- Users & Auth --------
-Role = Literal["admin", "user"]
+Role = Literal["head_admin", "admin", "editor", "user"]
 
 
 class UserBase(BaseModel):

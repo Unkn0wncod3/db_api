@@ -1,7 +1,9 @@
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException
+
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import LinkProfilePayload
 from ..security import require_role
 from ..visibility import inherit_visibility, visibility_clause_for_role
@@ -12,7 +14,7 @@ router = APIRouter(
 )
 
 @router.get("/{person_id}/profiles")
-def list_person_profiles(person_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
+def list_person_profiles(person_id: int, current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = """
         SELECT ppm.profile_id, pf.name AS platform, pr.username, pr.display_name, pr.status, pr.url
@@ -33,7 +35,7 @@ def list_person_profiles(person_id: int, current_user: Dict = Depends(require_ro
         rows = cur.fetchall()
     return {"items": rows}
 
-@router.post("/{person_id}/profiles", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("/{person_id}/profiles", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def link_person_profile(person_id: int, payload: LinkProfilePayload):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (person_id,))
@@ -56,7 +58,7 @@ def link_person_profile(person_id: int, payload: LinkProfilePayload):
         conn.commit()
     return row
 
-@router.delete("/{person_id}/profiles/{profile_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{person_id}/profiles/{profile_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def unlink_person_profile(person_id: int, profile_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
+from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import VehicleCreate, VehicleUpdate
 from ..security import require_role
 from ..visibility import visibility_clause_for_role
@@ -15,7 +16,7 @@ router = APIRouter(
 
 
 @router.get("")
-def list_vehicles(current_user: Dict = Depends(require_role("user", "admin"))):
+def list_vehicles(current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = "SELECT * FROM vehicles v WHERE 1=1"
         params = []
@@ -30,7 +31,7 @@ def list_vehicles(current_user: Dict = Depends(require_role("user", "admin"))):
 
 
 @router.get("/{vehicle_id}")
-def get_vehicle(vehicle_id: int, current_user: Dict = Depends(require_role("user", "admin"))):
+def get_vehicle(vehicle_id: int, current_user: Dict = Depends(require_role(*READ_ROLES))):
     with get_connection() as conn, conn.cursor() as cur:
         sql = "SELECT * FROM vehicles v WHERE v.id=%s"
         params = [vehicle_id]
@@ -44,7 +45,7 @@ def get_vehicle(vehicle_id: int, current_user: Dict = Depends(require_role("user
         raise HTTPException(404, "Vehicle not found")
     return row
 
-@router.post("", status_code=201, dependencies=[Depends(require_role("admin"))])
+@router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def create_vehicle(payload: VehicleCreate):
     data = payload.model_dump()
     if data.get("metadata") is not None:
@@ -68,7 +69,7 @@ def create_vehicle(payload: VehicleCreate):
     return row
 
 
-@router.patch("/{vehicle_id}", dependencies=[Depends(require_role("admin"))])
+@router.patch("/{vehicle_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
 def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
@@ -91,7 +92,7 @@ def update_vehicle(vehicle_id: int, payload: VehicleUpdate):
     return row
 
 
-@router.delete("/{vehicle_id}", dependencies=[Depends(require_role("admin"))])
+@router.delete("/{vehicle_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
 def delete_vehicle(vehicle_id: int):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM vehicles WHERE id=%s RETURNING id;", (vehicle_id,))
