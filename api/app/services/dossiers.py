@@ -377,5 +377,7 @@ def render_dossier_pdf(dossier: Dict[str, Any], brand_label: str = "DB API") -> 
         f"Profiles: {stats['profiles']['total']} | Notes: {stats['notes']['total']} | Activities: {stats['activities']['total']}"
     )
 
-    pdf_bytes = pdf.output(dest="S").encode("latin-1")
-    return pdf_bytes
+    raw = pdf.output(dest="S")
+    if isinstance(raw, str):
+        return raw.encode("latin-1")
+    return bytes(raw)
