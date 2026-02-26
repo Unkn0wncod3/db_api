@@ -45,7 +45,6 @@ def _write_log(payload: Dict[str, Any]) -> None:
 
 
 def log_event(
-    *,
     user: Optional[Dict[str, Any]],
     action: str,
     resource: Optional[str],
@@ -102,16 +101,16 @@ async def log_request_event(
     user_agent = request.headers.get("user-agent")
     await anyio.to_thread.run_sync(
         log_event,
-        user=user,
-        action=action,
-        resource=resource,
-        resource_id=resource_id,
-        method=method,
-        path=path,
-        status_code=status_code,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        metadata=metadata,
+        user,
+        action,
+        resource,
+        resource_id,
+        method,
+        path,
+        status_code,
+        ip_address,
+        user_agent,
+        metadata,
     )
     request.state.audit_metadata = None
 
