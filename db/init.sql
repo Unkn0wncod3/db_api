@@ -47,6 +47,27 @@ CREATE TRIGGER trg_users_updated
 BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- Audit Logs capture per-request activity for accountability
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    username TEXT,
+    role TEXT,
+    action TEXT NOT NULL,
+    resource TEXT,
+    resource_id BIGINT,
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    status_code INT NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_time ON audit_logs (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
+
 -- ============================================================
 -- Personen
 -- ============================================================

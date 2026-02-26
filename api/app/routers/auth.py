@@ -1,6 +1,6 @@
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from ..schemas import AuthLoginRequest, AuthLoginResponse, UserResponse, UserUpdate
 from ..security import create_access_token, get_current_user, verify_password
@@ -10,13 +10,27 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=AuthLoginResponse, status_code=status.HTTP_200_OK)
-def login(payload: AuthLoginRequest):
+def login(payload: AuthLoginRequest, request: Request):
+    request.state.audit_metadata = {"username": payload.username, "outcome": "attempt"}
     db_user = user_service.get_user_by_username(payload.username, include_secret=True)
     if not db_user or not db_user.get("is_active"):
+        request.state.audit_metadata = {"username": payload.username, "outcome": "invalid_username_or_inactive"}
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
     if not verify_password(payload.password, db_user["password_hash"]):
+        request.state.audit_metadata = {"username": payload.username, "outcome": "invalid_password"}
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
+    request.state.current_user = {
+        "id": db_user["id"],
+        "username": db_user["username"],
+        "role": db_user["role"],
+        "is_active": db_user["is_active"],
+    }
+    request.state.audit_metadata = {
+        "username": payload.username,
+        "outcome": "success",
+        "user_id": db_user["id"],
+    }
     token = create_access_token(db_user)
     user_payload = UserResponse(
         id=db_user["id"],

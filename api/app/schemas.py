@@ -229,6 +229,29 @@ class UserListResponse(BaseModel):
     offset: int
 
 
+class AuditLogEntry(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    role: Optional[str] = None
+    action: str
+    resource: Optional[str] = None
+    resource_id: Optional[int] = None
+    method: str
+    path: str
+    status_code: int
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class AuditLogListResponse(BaseModel):
+    items: List[AuditLogEntry]
+    limit: int
+    offset: int
+
+
 class AuthLoginRequest(BaseModel):
     username: str
     password: str

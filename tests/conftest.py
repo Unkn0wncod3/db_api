@@ -15,7 +15,7 @@ def _test_current_user(request: Request):
     if role not in valid_roles:
         role = "head_admin"
     now = datetime.utcnow()
-    return {
+    user = {
         "id": 999,
         "username": f"test_{role}",
         "role": role,
@@ -23,6 +23,8 @@ def _test_current_user(request: Request):
         "created_at": now,
         "updated_at": None,
     }
+    request.state.current_user = user
+    return user
 
 
 @pytest.fixture(scope="session")

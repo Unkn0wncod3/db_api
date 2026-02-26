@@ -7,7 +7,7 @@ import secrets
 import time
 from typing import Any, Callable, Dict
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .db import get_connection
@@ -84,7 +84,10 @@ def _decode_access_token(token: str) -> Dict[str, Any]:
     return payload
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme)) -> Dict[str, Any]:
+def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+) -> Dict[str, Any]:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
     token_data = _decode_access_token(credentials.credentials)
@@ -102,6 +105,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token role mismatch")
     if user.get("preferences") is None:
         user["preferences"] = {}
+    request.state.current_user = user
     return user
 
 
