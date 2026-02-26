@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
-from .middleware.audit import AuditLoggingMiddleware
+from .middleware.audit import register_audit_logging
 from .routers import audit, auth, persons, notes, platforms, profiles, person_links, vehicles, activities, views, stats, users
 from .services.users import ensure_default_admin
 
@@ -16,7 +16,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(AuditLoggingMiddleware)
+register_audit_logging(app)
 
 app.include_router(persons.router)
 app.include_router(auth.router)

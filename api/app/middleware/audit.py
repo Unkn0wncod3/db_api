@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from fastapi import HTTPException as FastAPIHTTPException, Request
+import logging
+
+from fastapi import FastAPI, HTTPException as FastAPIHTTPException, Request
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from ..services import audit_logs
 
+logger = logging.getLogger(__name__)
 
-class AuditLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+
+def register_audit_logging(app: FastAPI) -> None:
+    @app.middleware("http")
+    async def audit_logging(request: Request, call_next):
         if not hasattr(request.state, "current_user"):
             request.state.current_user = None
 
@@ -32,6 +36,5 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                     resp,
                     status_code_override=status_override,
                 )
-            except Exception:
-                # Never block requests due to logging issues
-                pass
+            except Exception as exc:  # pragma: no cover
+                logger.warning("audit logging failed: %s", exc)
