@@ -93,7 +93,7 @@ async def log_request_event(
         token = auth_header.split(" ", 1)[1].strip()
         user = resolve_user_from_token(token)
 
-    if request.method.upper() == "GET" and request.url.path == "/" and not auth_header:
+    if request.method.upper() == "GET" and request.url.path == "/":
         return
 
     route = request.scope.get("route")
