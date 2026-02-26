@@ -59,3 +59,30 @@ def test_user_patch_requires_fields(client):
     assert empty_patch.json()["detail"] == "No fields to update"
 
     client.delete(f"/users/{user_id}")
+
+
+def test_admin_can_toggle_user_status_and_prevent_login(client):
+    username = f"user-{uuid.uuid4().hex[:8]}"
+    password = "StatusPass!234"
+    create_resp = client.post(
+        "/users",
+        json={"username": username, "password": password, "role": "user"},
+    )
+    assert create_resp.status_code == 201
+    user_id = create_resp.json()["id"]
+
+    deactivate_resp = client.patch(f"/users/{user_id}/status", json={"is_active": False})
+    assert deactivate_resp.status_code == 200
+    assert deactivate_resp.json()["is_active"] is False
+
+    denied_login = client.post("/auth/login", json={"username": username, "password": password})
+    assert denied_login.status_code == 401
+
+    reactivate_resp = client.patch(f"/users/{user_id}/status", json={"is_active": True})
+    assert reactivate_resp.status_code == 200
+    assert reactivate_resp.json()["is_active"] is True
+
+    login_resp = client.post("/auth/login", json={"username": username, "password": password})
+    assert login_resp.status_code == 200
+
+    client.delete(f"/users/{user_id}")

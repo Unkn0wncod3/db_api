@@ -208,6 +208,10 @@ class UserUpdate(BaseModel):
     preferences: Optional[Dict[str, Any]] = None
 
 
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+
 class UserResponse(BaseModel):
     id: int
     username: str

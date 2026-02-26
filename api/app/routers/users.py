@@ -3,7 +3,7 @@ from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..roles import ADMIN_ROLES
-from ..schemas import UserCreate, UserListResponse, UserResponse, UserUpdate
+from ..schemas import UserCreate, UserListResponse, UserResponse, UserStatusUpdate, UserUpdate
 from ..security import require_role
 from ..services import users as user_service
 
@@ -44,6 +44,19 @@ def update_user_endpoint(
     if not update_fields:
         raise HTTPException(status_code=400, detail="No fields to update")
     return user_service.update_user(user_id, update_fields, acting_user=current_user)
+
+
+@router.patch("/{user_id}/status", response_model=UserResponse)
+def set_user_status(
+    user_id: int,
+    payload: UserStatusUpdate,
+    current_user: Dict = Depends(require_role(*ADMIN_ROLES)),
+):
+    return user_service.update_user(
+        user_id,
+        {"is_active": payload.is_active},
+        acting_user=current_user,
+    )
 
 
 @router.delete("/{user_id}", response_model=UserResponse)
