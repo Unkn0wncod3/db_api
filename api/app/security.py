@@ -5,7 +5,7 @@ import json
 import os
 import secrets
 import time
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -84,27 +84,40 @@ def _decode_access_token(token: str) -> Dict[str, Any]:
     return payload
 
 
+def _load_user_from_token_payload(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, username, role, is_active, profile_picture_url, preferences, created_at, updated_at FROM users WHERE id=%s;",
+            (payload["sub"],),
+        )
+        user = cur.fetchone()
+
+    if not user or not user.get("is_active"):
+        return None
+    if user["role"] != payload.get("role"):
+        return None
+    if user.get("preferences") is None:
+        user["preferences"] = {}
+    return user
+
+
+def resolve_user_from_token(token: str) -> Optional[Dict[str, Any]]:
+    try:
+        payload = _decode_access_token(token)
+    except HTTPException:
+        return None
+    return _load_user_from_token_payload(payload)
+
+
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
 ) -> Dict[str, Any]:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token")
-    token_data = _decode_access_token(credentials.credentials)
-
-    with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, username, role, is_active, profile_picture_url, preferences, created_at, updated_at FROM users WHERE id=%s;",
-            (token_data["sub"],),
-        )
-        user = cur.fetchone()
-
-    if not user or not user.get("is_active"):
+    user = resolve_user_from_token(credentials.credentials)
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
-    if user["role"] != token_data.get("role"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token role mismatch")
-    if user.get("preferences") is None:
-        user["preferences"] = {}
     request.state.current_user = user
     return user
 

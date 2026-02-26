@@ -8,6 +8,7 @@ from fastapi import Request
 from starlette.responses import Response
 
 from ..db import get_connection
+from ..security import resolve_user_from_token
 
 try:
     from psycopg.types.json import Jsonb
@@ -83,8 +84,16 @@ async def log_request_event(
     status_code_override: Optional[int] = None,
 ) -> None:
     user = getattr(request.state, "current_user", None)
+    if user is None:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
+            user = resolve_user_from_token(token)
+
     route = request.scope.get("route")
     resource = getattr(route, "path", None) if route is not None else None
+    if not resource:
+        resource = request.url.path
     action = f"{request.method} {resource or request.url.path}"
     path_params = getattr(request, "path_params", {}) or {}
     resource_id = _extract_resource_id(path_params)
@@ -97,7 +106,11 @@ async def log_request_event(
     method = request.method
     path = request.url.path
     status_code = status_code_override or getattr(response, "status_code", 500)
-    ip_address = request.client.host if request.client else None
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        ip_address = forwarded_for.split(",")[0].strip()
+    else:
+        ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     await anyio.to_thread.run_sync(
         log_event,

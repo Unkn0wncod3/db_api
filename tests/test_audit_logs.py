@@ -63,3 +63,39 @@ def test_login_attempts_are_logged_with_username(client):
     )
 
     client.delete(f"/users/{create_resp.json()['id']}")
+
+
+def test_token_is_logged_even_for_unknown_route(client):
+    username = f"audit-missing-{uuid.uuid4().hex[:8]}"
+    password = "MissingRoute123!"
+    create_resp = client.post(
+        "/users",
+        json={"username": username, "password": password, "role": "user"},
+    )
+    assert create_resp.status_code == 201
+    user_id = create_resp.json()["id"]
+
+    login_resp = client.post("/auth/login", json={"username": username, "password": password})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["access_token"]
+
+    missing = client.get(
+        "/no-such-endpoint",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Forwarded-For": "203.0.113.5, 10.0.0.1",
+        },
+    )
+    assert missing.status_code == 404
+
+    logs = client.get("/audit/logs", params={"limit": 20})
+    assert logs.status_code == 200
+    entries = logs.json()["items"]
+    assert any(
+        entry["path"] == "/no-such-endpoint"
+        and entry["user_id"] == user_id
+        and entry["ip_address"] == "203.0.113.5"
+        for entry in entries
+    )
+
+    client.delete(f"/users/{user_id}")
