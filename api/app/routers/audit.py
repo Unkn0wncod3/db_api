@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from ..roles import ADMIN_ROLES
 from ..schemas import AuditLogListResponse
@@ -29,5 +29,9 @@ def list_audit_logs(
 
 
 @router.delete("/logs", status_code=204)
-def delete_audit_logs(_: Dict = Depends(require_role(*ADMIN_ROLES))):
+def delete_audit_logs(request: Request, _: Dict = Depends(require_role(*ADMIN_ROLES))):
     audit_service.clear_logs()
+    audit_service.attach_request_metadata(
+        request,
+        event="audit_logs_cleared",
+    )

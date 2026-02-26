@@ -184,3 +184,11 @@ def clear_logs() -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM audit_logs;")
         conn.commit()
+
+
+def attach_request_metadata(request: Request, **fields: Any) -> None:
+    existing = getattr(request.state, "audit_metadata", None)
+    if not isinstance(existing, dict):
+        existing = {}
+    existing.update(fields)
+    request.state.audit_metadata = existing

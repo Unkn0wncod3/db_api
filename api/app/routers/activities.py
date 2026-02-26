@@ -1,12 +1,13 @@
 from typing import Optional, Any, List, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import ActivityCreate, ActivityUpdate
 from ..security import require_role
+from ..services import audit_logs
 from ..visibility import inherit_visibility, visibility_clause_for_role
 
 router = APIRouter(
@@ -81,7 +82,7 @@ def get_activity(activity_id: int, current_user: Dict[str, Any] = Depends(requir
     return row
 
 @router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def create_activity(payload: ActivityCreate):
+def create_activity(payload: ActivityCreate, request: Request):
     data = payload.model_dump()
     if not any([data.get("vehicle_id"), data.get("profile_id"), data.get("item")]):
         raise HTTPException(400, "At least one of vehicle_id, profile_id or item must be provided.")
@@ -109,11 +110,18 @@ def create_activity(payload: ActivityCreate):
         )
         row = cur.fetchone()
         conn.commit()
+    audit_logs.attach_request_metadata(
+        request,
+        event="activity_created",
+        activity_id=row["id"],
+        person_id=row["person_id"],
+        activity_type=row["activity_type"],
+    )
     return row
 
 
 @router.patch("/{activity_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def update_activity(activity_id: int, payload: ActivityUpdate):
+def update_activity(activity_id: int, payload: ActivityUpdate, request: Request):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
@@ -132,15 +140,29 @@ def update_activity(activity_id: int, payload: ActivityUpdate):
         conn.commit()
     if not row:
         raise HTTPException(404, "Activity not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="activity_updated",
+        activity_id=row["id"],
+        person_id=row["person_id"],
+        changed_fields=sorted(fields.keys()),
+    )
     return row
 
 
 @router.delete("/{activity_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
-def delete_activity(activity_id: int):
+def delete_activity(activity_id: int, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("DELETE FROM activities WHERE id=%s RETURNING id;", (activity_id,))
+        cur.execute("DELETE FROM activities WHERE id=%s RETURNING id, person_id, activity_type;", (activity_id,))
         row = cur.fetchone()
         conn.commit()
     if not row:
         raise HTTPException(404, "Activity not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="activity_deleted",
+        activity_id=row["id"],
+        person_id=row.get("person_id"),
+        activity_type=row.get("activity_type"),
+    )
     return {"deleted": row["id"]}

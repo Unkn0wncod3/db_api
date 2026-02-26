@@ -7,7 +7,7 @@ from ..db import get_connection
 from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import PersonCreate, PersonDossierResponse, PersonUpdate
 from ..security import require_role
-from ..services import dossiers as dossier_service
+from ..services import audit_logs, dossiers as dossier_service
 from ..visibility import visibility_clause_for_role
 
 DEPENDENT_TABLES = ("notes", "person_profile_map", "activities")
@@ -77,7 +77,7 @@ def get_person(person_id: int, current_user: Dict[str, Any] = Depends(require_ro
 
 
 @router.post("", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def create_person(payload: PersonCreate):
+def create_person(payload: PersonCreate, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
         data = payload.model_dump()
         if data.get("metadata") is not None:
@@ -99,11 +99,19 @@ def create_person(payload: PersonCreate):
         )
         row = cur.fetchone()
         conn.commit()
+    audit_logs.attach_request_metadata(
+        request,
+        event="person_created",
+        person_id=row["id"],
+        first_name=row["first_name"],
+        last_name=row["last_name"],
+        visibility=row["visibility_level"],
+    )
     return row
 
 
 @router.patch("/{person_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def update_person(person_id: int, payload: PersonUpdate):
+def update_person(person_id: int, payload: PersonUpdate, request: Request):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
@@ -121,17 +129,30 @@ def update_person(person_id: int, payload: PersonUpdate):
         conn.commit()
     if not row:
         raise HTTPException(404, "Person not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="person_updated",
+        person_id=row["id"],
+        changed_fields=sorted(fields.keys()),
+    )
     return row
 
 
 @router.delete("/{person_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
-def delete_person(person_id: int):
+def delete_person(person_id: int, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("DELETE FROM persons WHERE id=%s RETURNING id;", (person_id,))
+        cur.execute("DELETE FROM persons WHERE id=%s RETURNING id, first_name, last_name;", (person_id,))
         row = cur.fetchone()
         conn.commit()
     if not row:
         raise HTTPException(404, "Person not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="person_deleted",
+        person_id=row["id"],
+        first_name=row.get("first_name"),
+        last_name=row.get("last_name"),
+    )
     return {"deleted": row["id"]}
 
 

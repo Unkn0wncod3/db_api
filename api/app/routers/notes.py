@@ -1,11 +1,12 @@
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..db import get_connection
 from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import NoteCreate, NoteUpdate
 from ..security import require_role
+from ..services import audit_logs
 from ..visibility import inherit_visibility, visibility_clause_for_role
 
 router = APIRouter(
@@ -62,7 +63,7 @@ def get_note(note_id: int, current_user: Dict = Depends(require_role(*READ_ROLES
 
 
 @router.patch("/{note_id}", dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def update_note(note_id: int, payload: NoteUpdate):
+def update_note(note_id: int, payload: NoteUpdate, request: Request):
     fields = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not fields:
         raise HTTPException(400, "No fields to update")
@@ -77,17 +78,31 @@ def update_note(note_id: int, payload: NoteUpdate):
         conn.commit()
     if not row:
         raise HTTPException(404, "Note not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="note_updated",
+        note_id=row["id"],
+        person_id=row["person_id"],
+        changed_fields=sorted(fields.keys()),
+        pinned=row.get("pinned"),
+    )
     return row
 
 
 @router.delete("/{note_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
-def delete_note(note_id: int):
+def delete_note(note_id: int, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute("DELETE FROM notes WHERE id=%s RETURNING id;", (note_id,))
+        cur.execute("DELETE FROM notes WHERE id=%s RETURNING id, person_id;", (note_id,))
         row = cur.fetchone()
         conn.commit()
     if not row:
         raise HTTPException(404, "Note not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="note_deleted",
+        note_id=row["id"],
+        person_id=row.get("person_id"),
+    )
     return {"deleted": row["id"]}
 
 
@@ -109,7 +124,7 @@ def list_person_notes(person_id: int, current_user: Dict = Depends(require_role(
 
 
 @router.post("/by-person/{person_id}", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def add_person_note(person_id: int, payload: NoteCreate):
+def add_person_note(person_id: int, payload: NoteCreate, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (person_id,))
         person = cur.fetchone()
@@ -126,4 +141,11 @@ def add_person_note(person_id: int, payload: NoteCreate):
         )
         row = cur.fetchone()
         conn.commit()
+    audit_logs.attach_request_metadata(
+        request,
+        event="note_created",
+        note_id=row["id"],
+        person_id=row["person_id"],
+        pinned=row["pinned"],
+    )
     return row

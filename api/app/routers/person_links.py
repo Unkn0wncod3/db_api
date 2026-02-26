@@ -1,11 +1,12 @@
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..db import get_connection
 from ..roles import ADMIN_ROLES, EDITOR_ROLES, READ_ROLES
 from ..schemas import LinkProfilePayload
 from ..security import require_role
+from ..services import audit_logs
 from ..visibility import inherit_visibility, visibility_clause_for_role
 
 router = APIRouter(
@@ -36,7 +37,7 @@ def list_person_profiles(person_id: int, current_user: Dict = Depends(require_ro
     return {"items": rows}
 
 @router.post("/{person_id}/profiles", status_code=201, dependencies=[Depends(require_role(*EDITOR_ROLES))])
-def link_person_profile(person_id: int, payload: LinkProfilePayload):
+def link_person_profile(person_id: int, payload: LinkProfilePayload, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("SELECT visibility_level FROM persons WHERE id=%s;", (person_id,))
         person = cur.fetchone()
@@ -56,10 +57,17 @@ def link_person_profile(person_id: int, payload: LinkProfilePayload):
         )
         row = cur.fetchone()
         conn.commit()
+    audit_logs.attach_request_metadata(
+        request,
+        event="profile_linked",
+        person_id=row["person_id"],
+        profile_id=row["profile_id"],
+        note=row.get("note"),
+    )
     return row
 
 @router.delete("/{person_id}/profiles/{profile_id}", dependencies=[Depends(require_role(*ADMIN_ROLES))])
-def unlink_person_profile(person_id: int, profile_id: int):
+def unlink_person_profile(person_id: int, profile_id: int, request: Request):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             "DELETE FROM person_profile_map WHERE person_id=%s AND profile_id=%s RETURNING person_id, profile_id;",
@@ -69,4 +77,10 @@ def unlink_person_profile(person_id: int, profile_id: int):
         conn.commit()
     if not row:
         raise HTTPException(404, "Link not found")
+    audit_logs.attach_request_metadata(
+        request,
+        event="profile_unlinked",
+        person_id=row["person_id"],
+        profile_id=row["profile_id"],
+    )
     return {"deleted": row}
