@@ -151,8 +151,8 @@ def list_logs(
     if resource:
         clauses.append("resource = %(resource)s")
         params["resource"] = resource
-    where_clause = f\"WHERE {' AND '.join(clauses)}\" if clauses else ""
-    query = f\"SELECT {AUDIT_COLUMNS} FROM audit_logs {where_clause} ORDER BY id DESC LIMIT %(limit)s OFFSET %(offset)s;\"
+    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    query = f"SELECT {AUDIT_COLUMNS} FROM audit_logs {where_clause} ORDER BY id DESC LIMIT %(limit)s OFFSET %(offset)s;"
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(query, params)
         rows = cur.fetchall()
