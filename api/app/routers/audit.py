@@ -26,3 +26,8 @@ def list_audit_logs(
         action=action,
         resource=resource,
     )
+
+
+@router.delete("/logs", status_code=204)
+def delete_audit_logs(_: Dict = Depends(require_role(*ADMIN_ROLES))):
+    audit_service.clear_logs()

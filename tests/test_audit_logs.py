@@ -99,3 +99,15 @@ def test_token_is_logged_even_for_unknown_route(client):
     )
 
     client.delete(f"/users/{user_id}")
+
+
+def test_admin_can_delete_audit_logs(client):
+    pre = client.get("/audit/logs", params={"limit": 5})
+    assert pre.status_code == 200
+
+    delete_resp = client.delete("/audit/logs")
+    assert delete_resp.status_code == 204
+
+    post = client.get("/audit/logs", params={"limit": 5})
+    assert post.status_code == 200
+    assert post.json()["items"] == []

@@ -172,3 +172,9 @@ def list_logs(
         if row.get("metadata") is None:
             row["metadata"] = {}
     return {"items": rows, "limit": limit, "offset": offset}
+
+
+def clear_logs() -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM audit_logs;")
+        conn.commit()
