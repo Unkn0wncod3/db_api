@@ -83,12 +83,18 @@ async def log_request_event(
     *,
     status_code_override: Optional[int] = None,
 ) -> None:
+    # Skip noisy framework calls (CORS preflight) immediately
+    if request.method.upper() == "OPTIONS":
+        return
+
     user = getattr(request.state, "current_user", None)
-    if user is None:
-        auth_header = request.headers.get("authorization")
-        if auth_header and auth_header.lower().startswith("bearer "):
-            token = auth_header.split(" ", 1)[1].strip()
-            user = resolve_user_from_token(token)
+    auth_header = request.headers.get("authorization")
+    if user is None and auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+        user = resolve_user_from_token(token)
+
+    if request.method.upper() == "GET" and request.url.path == "/" and not auth_header:
+        return
 
     route = request.scope.get("route")
     resource = getattr(route, "path", None) if route is not None else None

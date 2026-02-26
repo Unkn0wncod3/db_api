@@ -111,3 +111,17 @@ def test_admin_can_delete_audit_logs(client):
     post = client.get("/audit/logs", params={"limit": 5})
     assert post.status_code == 200
     assert post.json()["items"] == []
+
+
+def test_noise_requests_are_ignored(client):
+    client.delete("/audit/logs")
+
+    root_resp = client.get("/")
+    assert root_resp.status_code == 200
+
+    options_resp = client.options("/users")
+    assert options_resp.status_code in {200, 204}
+
+    logs = client.get("/audit/logs", params={"limit": 5})
+    assert logs.status_code == 200
+    assert logs.json()["items"] == []
