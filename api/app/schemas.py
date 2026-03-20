@@ -33,6 +33,20 @@ class FieldDefinitionCreate(FieldDefinitionBase):
     pass
 
 
+class FieldDefinitionUpdate(BaseModel):
+    key: Optional[str] = Field(default=None, pattern=r"^[a-z][a-z0-9_]*$")
+    label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = None
+    data_type: Optional[FieldDataType] = None
+    is_required: Optional[bool] = None
+    is_unique: Optional[bool] = None
+    default_value: Optional[Any] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+    validation_json: Optional[Dict[str, Any]] = None
+    settings_json: Optional[Dict[str, Any]] = None
+
+
 class FieldDefinitionResponse(FieldDefinitionBase):
     model_config = ConfigDict(from_attributes=True)
 

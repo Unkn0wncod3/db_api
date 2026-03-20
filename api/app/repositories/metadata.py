@@ -63,6 +63,14 @@ class FieldRepository:
             cur.execute(sql, params)
             return cur.fetchall()
 
+    def get_field(self, schema_id: int, field_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM fields WHERE schema_id=%s AND id=%s;", (schema_id, field_id))
+            row = cur.fetchone()
+        if not row:
+            raise NotFoundError("Field not found")
+        return row
+
     def create_field(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         record = dict(payload)
         record["validation_json"] = _jsonb(record.get("validation_json") or {})
@@ -89,6 +97,43 @@ class FieldRepository:
                 raise ConflictError("Field key already exists in schema")
             row = cur.fetchone()
             conn.commit()
+        return row
+
+    def update_field(self, schema_id: int, field_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
+        if not updates:
+            raise NotFoundError("No field updates supplied")
+        payload = dict(updates)
+        if "validation_json" in payload:
+            payload["validation_json"] = _jsonb(payload.get("validation_json") or {})
+        if "settings_json" in payload:
+            payload["settings_json"] = _jsonb(payload.get("settings_json") or {})
+        if "default_value" in payload:
+            payload["default_value"] = _jsonb(payload.get("default_value"))
+        payload["schema_id"] = schema_id
+        payload["field_id"] = field_id
+        assignments = ", ".join(f"{key}=%({key})s" for key in updates)
+        with get_connection() as conn, conn.cursor() as cur:
+            try:
+                cur.execute(
+                    f"UPDATE fields SET {assignments} WHERE schema_id=%(schema_id)s AND id=%(field_id)s RETURNING *;",
+                    payload,
+                )
+            except UniqueViolation:
+                conn.rollback()
+                raise ConflictError("Field key already exists in schema")
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Field not found")
+        return row
+
+    def delete_field(self, schema_id: int, field_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM fields WHERE schema_id=%s AND id=%s RETURNING *;", (schema_id, field_id))
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Field not found")
         return row
 
 

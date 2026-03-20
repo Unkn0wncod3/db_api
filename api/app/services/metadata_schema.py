@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from ..core.enums import EntryPermission
+from ..core.errors import ValidationError
 from ..repositories.metadata import EntryRepository, FieldRepository, SchemaRepository
 from .permissions import PermissionService
 
@@ -50,3 +51,21 @@ class MetadataSchemaService:
         record = dict(payload)
         record["schema_id"] = schema_id
         return self.fields.create_field(record)
+
+    def list_fields(self, schema_id: int, *, include_inactive: bool = True) -> List[Dict[str, Any]]:
+        self.schemas.get_schema(schema_id)
+        return self.fields.list_fields(schema_id, include_inactive=include_inactive)
+
+    def get_field(self, schema_id: int, field_id: int) -> Dict[str, Any]:
+        self.schemas.get_schema(schema_id)
+        return self.fields.get_field(schema_id, field_id)
+
+    def update_field(self, schema_id: int, field_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self.schemas.get_schema(schema_id)
+        if not payload:
+            raise ValidationError([{"field": "_request", "message": "No fields to update"}])
+        return self.fields.update_field(schema_id, field_id, payload)
+
+    def delete_field(self, schema_id: int, field_id: int) -> Dict[str, Any]:
+        self.schemas.get_schema(schema_id)
+        return self.fields.delete_field(schema_id, field_id)

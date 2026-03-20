@@ -5,7 +5,14 @@ from typing import Dict, Optional
 from fastapi import APIRouter, Depends, Query
 
 from ..roles import READ_ROLES, SCHEMA_WRITE_ROLES
-from ..schemas import FieldDefinitionCreate, MetadataSchemaCreate, MetadataSchemaResponse, SchemaEntriesResponse
+from ..schemas import (
+    FieldDefinitionCreate,
+    FieldDefinitionResponse,
+    FieldDefinitionUpdate,
+    MetadataSchemaCreate,
+    MetadataSchemaResponse,
+    SchemaEntriesResponse,
+)
 from ..security import get_optional_current_user, require_role
 from ..services.metadata_schema import MetadataSchemaService
 
@@ -45,3 +52,32 @@ def add_field(
     _: Dict = Depends(require_role(*SCHEMA_WRITE_ROLES)),
 ):
     return service.add_field(schema_id, payload.model_dump())
+
+
+@router.get("/{schema_id}/fields", response_model=list[FieldDefinitionResponse])
+def list_fields(
+    schema_id: int,
+    include_inactive: bool = Query(default=True),
+    _: Dict = Depends(require_role(*READ_ROLES)),
+):
+    return service.list_fields(schema_id, include_inactive=include_inactive)
+
+
+@router.get("/{schema_id}/fields/{field_id}", response_model=FieldDefinitionResponse)
+def get_field(schema_id: int, field_id: int, _: Dict = Depends(require_role(*READ_ROLES))):
+    return service.get_field(schema_id, field_id)
+
+
+@router.patch("/{schema_id}/fields/{field_id}", response_model=FieldDefinitionResponse)
+def update_field(
+    schema_id: int,
+    field_id: int,
+    payload: FieldDefinitionUpdate,
+    _: Dict = Depends(require_role(*SCHEMA_WRITE_ROLES)),
+):
+    return service.update_field(schema_id, field_id, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/{schema_id}/fields/{field_id}", response_model=FieldDefinitionResponse)
+def delete_field(schema_id: int, field_id: int, _: Dict = Depends(require_role(*SCHEMA_WRITE_ROLES))):
+    return service.delete_field(schema_id, field_id)
