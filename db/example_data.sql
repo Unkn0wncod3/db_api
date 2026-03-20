@@ -201,8 +201,6 @@ SELECT
     creator_u.id,
     x.data_json::jsonb
 FROM schemas s
-JOIN users owner_u ON owner_u.username = x.owner_username
-JOIN users creator_u ON creator_u.username = x.created_by_username
 JOIN (
     VALUES
     (
@@ -314,7 +312,9 @@ JOIN (
         '{"summary":"Prepare executive summary","description":"Draft summary for board meeting.","priority":"critical","due_at":"2026-03-25T09:00:00+00:00","effort_hours":"3.0","blocked":false}'
     )
 ) AS x(schema_key, title, status, visibility_level, owner_username, created_by_username, data_json)
-    ON x.schema_key = s.key;
+    ON x.schema_key = s.key
+JOIN users owner_u ON owner_u.username = x.owner_username
+JOIN users creator_u ON creator_u.username = x.created_by_username;
 
 
 -- ============================================================
