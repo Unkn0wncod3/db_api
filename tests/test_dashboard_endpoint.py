@@ -27,6 +27,10 @@ def _auth_headers() -> dict[str, str]:
 def test_dashboard_endpoint_returns_overview_totals_and_latest_entries(client):
     _ensure_test_actor()
     auth_headers = _auth_headers()
+    baseline_response = client.get("/dashboard", headers=auth_headers)
+    assert baseline_response.status_code == 200
+    baseline_payload = baseline_response.json()
+    baseline_total_entries = baseline_payload["total_entries"]
 
     person_schema = client.post(
         "/schemas",
@@ -93,7 +97,7 @@ def test_dashboard_endpoint_returns_overview_totals_and_latest_entries(client):
     assert response.status_code == 200
     payload = response.json()
 
-    assert payload["total_entries"] == 6
+    assert payload["total_entries"] == baseline_total_entries + 6
     assert len(payload["latest_created"]) == 5
     assert len(payload["latest_updated"]) == 5
     assert payload["latest_created"][0]["id"] == newest_created_id

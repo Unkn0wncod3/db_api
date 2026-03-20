@@ -6,8 +6,10 @@ from ..core.enums import EntryChangeType, EntryPermission
 from ..core.errors import ValidationError
 from ..repositories.metadata import EntryRepository, FieldRepository, SchemaRepository, ensure_unique_field_value
 from ..validation.entries import validate_entry_payload
+from .attachments import AttachmentService
 from .entry_history import EntryHistoryService
 from .permissions import PermissionService
+from .relations import RelationService
 
 
 class EntryService:
@@ -17,6 +19,8 @@ class EntryService:
         self.entries = EntryRepository()
         self.history = EntryHistoryService()
         self.permissions = PermissionService()
+        self.relations = RelationService()
+        self.attachments = AttachmentService()
 
     def list_entries(
         self,
@@ -38,6 +42,24 @@ class EntryService:
         row = self.entries.get_entry(entry_id)
         self.permissions.require_access(row, current_user, permission)
         return row
+
+    def get_entry_bundle(
+        self,
+        entry_id: int,
+        *,
+        current_user: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        entry = self.get_entry(entry_id, current_user=current_user, permission=EntryPermission.READ)
+        access = self._build_access_map(entry, current_user)
+        return {
+            "entry": entry,
+            "schema": self._get_schema_with_fields(entry["schema_id"]),
+            "access": access,
+            "history": self.history.list_history(entry_id) if access[EntryPermission.VIEW_HISTORY.value] else [],
+            "relations": self.relations.list_relations(entry_id),
+            "attachments": self.attachments.list_attachments(entry_id),
+            "permissions": self.permissions.list_permissions(entry_id) if access[EntryPermission.MANAGE_PERMISSIONS.value] else [],
+        }
 
     def create_entry(self, payload: Dict[str, Any], *, current_user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         schema = self.schemas.get_schema(payload["schema_id"])
@@ -148,3 +170,14 @@ class EntryService:
             if field_key not in data_json or data_json[field_key] is None:
                 continue
             ensure_unique_field_value(schema_id, field_key, data_json[field_key], exclude_entry_id=exclude_entry_id)
+
+    def _build_access_map(self, entry: Dict[str, Any], current_user: Optional[Dict[str, Any]]) -> Dict[str, bool]:
+        return {
+            permission.value: self.permissions.check_access(entry, current_user, permission)
+            for permission in EntryPermission
+        }
+
+    def _get_schema_with_fields(self, schema_id: int) -> Dict[str, Any]:
+        schema = self.schemas.get_schema(schema_id)
+        schema["fields"] = self.fields.list_fields(schema_id, include_inactive=True)
+        return schema

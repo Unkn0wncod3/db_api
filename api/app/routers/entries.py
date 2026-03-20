@@ -11,6 +11,7 @@ from ..schemas import (
     AttachmentLinkCreate,
     AttachmentResponse,
     EntryCreate,
+    EntryBundleResponse,
     EntryHistoryRecord,
     EntryPermissionCreate,
     EntryRelationCreate,
@@ -42,6 +43,11 @@ def list_entries(
 @router.get("/{entry_id}", response_model=EntryResponse)
 def get_entry(entry_id: int, current_user: Optional[Dict] = Depends(get_optional_current_user)):
     return entry_service.get_entry(entry_id, current_user=current_user)
+
+
+@router.get("/{entry_id}/bundle", response_model=EntryBundleResponse)
+def get_entry_bundle(entry_id: int, current_user: Optional[Dict] = Depends(get_optional_current_user)):
+    return entry_service.get_entry_bundle(entry_id, current_user=current_user)
 
 
 @router.post("", response_model=EntryResponse, status_code=201)

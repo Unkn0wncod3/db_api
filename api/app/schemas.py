@@ -122,6 +122,18 @@ class EntryHistoryRecord(BaseModel):
     comment: Optional[str] = None
 
 
+class EntryRelationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    from_entry_id: int
+    to_entry_id: int
+    relation_type: EntryRelationType
+    sort_order: int
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
 class AttachmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -135,6 +147,18 @@ class AttachmentResponse(BaseModel):
     uploaded_by: Optional[int] = None
     uploaded_at: datetime
     description: Optional[str] = None
+
+
+class EntryPermissionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    entry_id: int
+    subject_type: PermissionSubjectType
+    subject_id: str
+    permission: EntryPermission
+    created_at: datetime
+    created_by: Optional[int] = None
 
 
 class AttachmentLinkCreate(BaseModel):
@@ -197,6 +221,18 @@ class DashboardOverviewResponse(BaseModel):
     latest_created: List[DashboardEntrySummary] = Field(default_factory=list)
     latest_updated: List[DashboardEntrySummary] = Field(default_factory=list)
     totals_per_schema: List[DashboardSchemaTotal] = Field(default_factory=list)
+
+
+class EntryBundleResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    entry: EntryResponse
+    schema_definition: MetadataSchemaResponse = Field(validation_alias="schema", serialization_alias="schema")
+    access: Dict[str, bool] = Field(default_factory=dict)
+    history: List[EntryHistoryRecord] = Field(default_factory=list)
+    relations: List[EntryRelationResponse] = Field(default_factory=list)
+    attachments: List[AttachmentResponse] = Field(default_factory=list)
+    permissions: List[EntryPermissionResponse] = Field(default_factory=list)
 
 
 Role = Literal["head_admin", "admin", "manager", "editor", "reader"]
