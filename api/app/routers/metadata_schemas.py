@@ -11,6 +11,7 @@ from ..schemas import (
     FieldDefinitionUpdate,
     MetadataSchemaCreate,
     MetadataSchemaResponse,
+    MetadataSchemaUpdate,
     SchemaEntriesResponse,
 )
 from ..security import get_optional_current_user, require_role
@@ -43,6 +44,20 @@ def get_schema_entries(schema_id: int, current_user: Optional[Dict] = Depends(ge
 def create_schema(payload: MetadataSchemaCreate, _: Dict = Depends(require_role(*SCHEMA_WRITE_ROLES))):
     created = service.create_schema(payload.model_dump())
     return service.get_schema(created["id"])
+
+
+@router.patch("/{schema_id}", response_model=MetadataSchemaResponse)
+def update_schema(
+    schema_id: int,
+    payload: MetadataSchemaUpdate,
+    _: Dict = Depends(require_role(*SCHEMA_WRITE_ROLES)),
+):
+    return service.update_schema(schema_id, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/{schema_id}", response_model=MetadataSchemaResponse)
+def delete_schema(schema_id: int, _: Dict = Depends(require_role(*SCHEMA_WRITE_ROLES))):
+    return service.delete_schema(schema_id)
 
 
 @router.post("/{schema_id}/fields", status_code=201)

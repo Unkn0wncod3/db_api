@@ -32,6 +32,9 @@ def _auth_headers() -> dict[str, str]:
 def test_global_history_endpoint_is_paginated_filterable_and_access_filtered(client):
     _ensure_users()
     auth_headers = _auth_headers()
+    baseline_resp = client.get("/history", headers=auth_headers)
+    assert baseline_resp.status_code == 200
+    baseline_total = baseline_resp.json()["total"]
 
     schema_resp = client.post(
         "/schemas",
@@ -154,12 +157,17 @@ def test_global_history_endpoint_is_paginated_filterable_and_access_filtered(cli
 
     assert payload["limit"] == 10
     assert payload["offset"] == 0
-    assert payload["total"] == 2
-    assert [item["entry_id"] for item in payload["items"]] == [own_entry_id, granted_entry_id]
-    assert payload["items"][0]["entry_title"] == "Own Visible Entry"
-    assert payload["items"][0]["changed_fields"] == ["summary", "visibility_level"]
-    assert payload["items"][1]["changed_by_username"] == "history_reader"
-    assert payload["items"][1]["changed_fields"] == ["summary"]
+    assert payload["total"] == baseline_total + 2
+
+    schema_resp = client.get(f"/history?schema_id={schema_id}&limit=10&offset=0", headers=auth_headers)
+    assert schema_resp.status_code == 200
+    schema_payload = schema_resp.json()
+    assert schema_payload["total"] == 2
+    assert [item["entry_id"] for item in schema_payload["items"]] == [own_entry_id, granted_entry_id]
+    assert schema_payload["items"][0]["entry_title"] == "Own Visible Entry"
+    assert schema_payload["items"][0]["changed_fields"] == ["summary", "visibility_level"]
+    assert schema_payload["items"][1]["changed_by_username"] == "history_reader"
+    assert schema_payload["items"][1]["changed_fields"] == ["summary"]
 
     search_resp = client.get("/history?search=Granted", headers=auth_headers)
     assert search_resp.status_code == 200

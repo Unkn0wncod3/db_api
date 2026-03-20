@@ -68,6 +68,14 @@ class MetadataSchemaCreate(MetadataSchemaBase):
     pass
 
 
+class MetadataSchemaUpdate(BaseModel):
+    key: Optional[str] = Field(default=None, pattern=r"^[a-z][a-z0-9_]*$")
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = None
+    icon: Optional[str] = Field(default=None, max_length=64)
+    is_active: Optional[bool] = None
+
+
 class MetadataSchemaResponse(MetadataSchemaBase):
     model_config = ConfigDict(from_attributes=True)
 

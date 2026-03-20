@@ -46,6 +46,19 @@ class MetadataSchemaService:
         schema["fields"] = []
         return schema
 
+    def update_schema(self, schema_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self.schemas.get_schema(schema_id)
+        if not payload:
+            raise ValidationError([{"field": "_request", "message": "No fields to update"}])
+        updated = self.schemas.update_schema(schema_id, payload)
+        updated["fields"] = self.fields.list_fields(schema_id, include_inactive=True)
+        return updated
+
+    def delete_schema(self, schema_id: int) -> Dict[str, Any]:
+        schema = self.get_schema(schema_id)
+        self.schemas.delete_schema(schema_id)
+        return schema
+
     def add_field(self, schema_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
         self.schemas.get_schema(schema_id)
         record = dict(payload)
