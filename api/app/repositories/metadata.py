@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from psycopg.errors import ForeignKeyViolation, UniqueViolation
+from psycopg.errors import UniqueViolation
 from psycopg.types.json import Jsonb
 
 from ..core.errors import ConflictError, NotFoundError
@@ -69,11 +69,8 @@ class SchemaRepository:
 
     def delete_schema(self, schema_id: int) -> Dict[str, Any]:
         with get_connection() as conn, conn.cursor() as cur:
-            try:
-                cur.execute("DELETE FROM schemas WHERE id=%s RETURNING *;", (schema_id,))
-            except ForeignKeyViolation:
-                conn.rollback()
-                raise ConflictError("Schema cannot be deleted while entries still exist")
+            cur.execute("DELETE FROM entries WHERE schema_id=%s;", (schema_id,))
+            cur.execute("DELETE FROM schemas WHERE id=%s RETURNING *;", (schema_id,))
             row = cur.fetchone()
             conn.commit()
         if not row:
@@ -126,35 +123,6 @@ class FieldRepository:
                 raise ConflictError("Field key already exists in schema")
             row = cur.fetchone()
             conn.commit()
-        return row
-
-    def update_schema(self, schema_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
-        payload = dict(updates)
-        payload["schema_id"] = schema_id
-        assignments = ", ".join(f"{key}=%({key})s" for key in updates)
-        with get_connection() as conn, conn.cursor() as cur:
-            try:
-                cur.execute(f"UPDATE schemas SET {assignments} WHERE id=%(schema_id)s RETURNING *;", payload)
-            except UniqueViolation:
-                conn.rollback()
-                raise ConflictError("Schema key already exists")
-            row = cur.fetchone()
-            conn.commit()
-        if not row:
-            raise NotFoundError("Schema not found")
-        return row
-
-    def delete_schema(self, schema_id: int) -> Dict[str, Any]:
-        with get_connection() as conn, conn.cursor() as cur:
-            try:
-                cur.execute("DELETE FROM schemas WHERE id=%s RETURNING *;", (schema_id,))
-            except ForeignKeyViolation:
-                conn.rollback()
-                raise ConflictError("Schema cannot be deleted while entries still exist")
-            row = cur.fetchone()
-            conn.commit()
-        if not row:
-            raise NotFoundError("Schema not found")
         return row
 
     def update_field(self, schema_id: int, field_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:

@@ -55,14 +55,14 @@ def test_schema_update_and_delete_endpoints(client):
     assert deleted["name"] == "Schema CRUD Case Updated"
 
 
-def test_schema_delete_returns_conflict_when_entries_exist(client):
+def test_schema_delete_cascades_entries(client):
     _ensure_test_actor()
     create_resp = client.post(
         "/schemas",
         json={
-            "key": "schema_delete_conflict",
-            "name": "Schema Delete Conflict",
-            "description": "Schema for delete conflict test",
+            "key": "schema_delete_cascade",
+            "name": "Schema Delete Cascade",
+            "description": "Schema for delete cascade test",
             "icon": "triangle-alert",
             "is_active": True,
         },
@@ -81,7 +81,14 @@ def test_schema_delete_returns_conflict_when_entries_exist(client):
         },
     )
     assert entry_resp.status_code == 201
+    entry_id = entry_resp.json()["id"]
 
     delete_resp = client.delete(f"/schemas/{schema_id}")
-    assert delete_resp.status_code == 409
-    assert "cannot be deleted" in delete_resp.json()["detail"]
+    assert delete_resp.status_code == 200
+    assert delete_resp.json()["id"] == schema_id
+
+    get_schema_resp = client.get(f"/schemas/{schema_id}")
+    assert get_schema_resp.status_code == 404
+
+    get_entry_resp = client.get(f"/entries/{entry_id}")
+    assert get_entry_resp.status_code == 404
