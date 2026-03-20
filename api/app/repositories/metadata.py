@@ -270,6 +270,130 @@ class HistoryRepository:
             row["new_data_json"] = row.get("new_data_json") or {}
         return rows
 
+    def list_global_history(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        search: Optional[str] = None,
+        schema_id: Optional[int] = None,
+        entry_id: Optional[int] = None,
+        changed_by: Optional[int] = None,
+        change_type: Optional[str] = None,
+        date_from: Optional[Any] = None,
+        date_to: Optional[Any] = None,
+        is_admin: bool = False,
+        user_id: Optional[int] = None,
+        role: Optional[str] = None,
+        group_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        clauses = ["e.deleted_at IS NULL"]
+        params: Dict[str, Any] = {
+            "limit": limit,
+            "offset": offset,
+            "user_id": user_id,
+            "user_id_text": str(user_id) if user_id is not None else None,
+            "role": role,
+            "group_ids": group_ids or [],
+        }
+
+        if not is_admin:
+            if user_id is None:
+                clauses.append("FALSE")
+            else:
+                grant_subjects = ["(ep.subject_type = 'user' AND ep.subject_id = %(user_id_text)s)"]
+                if role is not None:
+                    grant_subjects.append("(ep.subject_type = 'role' AND ep.subject_id = %(role)s)")
+                if group_ids:
+                    grant_subjects.append("(ep.subject_type = 'group' AND ep.subject_id = ANY(%(group_ids)s))")
+                clauses.append(
+                    f"""(
+                        e.owner_id = %(user_id)s
+                        OR EXISTS (
+                            SELECT 1
+                            FROM entry_permissions ep
+                            WHERE ep.entry_id = e.id
+                              AND ep.permission IN ('view_history', 'manage')
+                              AND ({' OR '.join(grant_subjects)})
+                        )
+                    )"""
+                )
+
+        if schema_id is not None:
+            clauses.append("s.id = %(schema_id)s")
+            params["schema_id"] = schema_id
+        if entry_id is not None:
+            clauses.append("e.id = %(entry_id)s")
+            params["entry_id"] = entry_id
+        if changed_by is not None:
+            clauses.append("h.changed_by = %(changed_by)s")
+            params["changed_by"] = changed_by
+        if change_type is not None:
+            clauses.append("h.change_type = %(change_type)s")
+            params["change_type"] = change_type
+        if date_from is not None:
+            clauses.append("h.changed_at >= %(date_from)s")
+            params["date_from"] = date_from
+        if date_to is not None:
+            clauses.append("h.changed_at <= %(date_to)s")
+            params["date_to"] = date_to
+        if search:
+            params["search"] = f"%{search}%"
+            clauses.append(
+                """(
+                    e.title ILIKE %(search)s
+                    OR s.key ILIKE %(search)s
+                    OR s.name ILIKE %(search)s
+                    OR COALESCE(h.comment, '') ILIKE %(search)s
+                    OR h.change_type ILIKE %(search)s
+                    OR COALESCE(u.username, '') ILIKE %(search)s
+                    OR COALESCE(h.changed_by::text, '') ILIKE %(search)s
+                )"""
+            )
+
+        where_sql = " AND ".join(clauses)
+        base_from_sql = f"""
+            FROM entry_history h
+            JOIN entries e ON e.id = h.entry_id
+            JOIN schemas s ON s.id = e.schema_id
+            LEFT JOIN users u ON u.id = h.changed_by
+            WHERE {where_sql}
+        """
+        count_sql = f"SELECT COUNT(*) AS total {base_from_sql};"
+        data_sql = f"""
+            SELECT
+                h.id,
+                h.entry_id,
+                e.title AS entry_title,
+                s.id AS schema_id,
+                s.key AS schema_key,
+                s.name AS schema_name,
+                h.changed_by,
+                u.username AS changed_by_username,
+                h.change_type,
+                h.old_data_json,
+                h.new_data_json,
+                h.old_visibility_level,
+                h.new_visibility_level,
+                h.changed_at,
+                h.comment
+            {base_from_sql}
+            ORDER BY h.changed_at DESC, h.id DESC
+            LIMIT %(limit)s OFFSET %(offset)s;
+        """
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(count_sql, params)
+            total_row = cur.fetchone() or {"total": 0}
+            cur.execute(data_sql, params)
+            rows = cur.fetchall()
+        for row in rows:
+            row["old_data_json"] = row.get("old_data_json") or {}
+            row["new_data_json"] = row.get("new_data_json") or {}
+        return {
+            "items": rows,
+            "total": total_row["total"],
+        }
+
 
 class PermissionRepository:
     def create_permission(self, payload: Dict[str, Any]) -> Dict[str, Any]:

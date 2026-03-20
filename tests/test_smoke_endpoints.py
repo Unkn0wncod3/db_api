@@ -3,6 +3,7 @@ import pytest
 CASES = [
     ("GET", "/", 200),
     ("GET", "/dashboard", 200),
+    ("GET", "/history", 200),
     ("GET", "/schemas", 200),
     ("GET", "/entries", 200),
     ("GET", "/users", 200),

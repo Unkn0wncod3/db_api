@@ -237,6 +237,32 @@ class DashboardOverviewResponse(BaseModel):
     totals_per_schema: List[DashboardSchemaTotal] = Field(default_factory=list)
 
 
+class GlobalHistoryItemResponse(BaseModel):
+    id: int
+    entry_id: int
+    entry_title: str
+    schema_id: int
+    schema_key: str
+    schema_name: str
+    changed_by: Optional[int] = None
+    changed_by_username: Optional[str] = None
+    change_type: EntryChangeType
+    old_data_json: Dict[str, Any] = Field(default_factory=dict)
+    new_data_json: Dict[str, Any] = Field(default_factory=dict)
+    old_visibility_level: Optional[VisibilityLevel] = None
+    new_visibility_level: Optional[VisibilityLevel] = None
+    changed_fields: List[str] = Field(default_factory=list)
+    changed_at: datetime
+    comment: Optional[str] = None
+
+
+class GlobalHistoryListResponse(BaseModel):
+    items: List[GlobalHistoryItemResponse] = Field(default_factory=list)
+    limit: int
+    offset: int
+    total: int
+
+
 class EntryBundleResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
