@@ -6,7 +6,7 @@ def test_user_update_supports_mutable_fields_and_metadata(client):
     create_payload = {
         "username": base_username,
         "password": "InitialPass123!",
-        "role": "user",
+        "role": "reader",
         "profile_picture_url": "https://example.com/avatar.png",
         "preferences": {"theme": "dark", "notifications": {"email": True}},
     }
@@ -49,7 +49,7 @@ def test_user_patch_requires_fields(client):
     username = f"user-{uuid.uuid4().hex[:8]}"
     create_resp = client.post(
         "/users",
-        json={"username": username, "password": "AnotherPass123!", "role": "user"},
+        json={"username": username, "password": "AnotherPass123!", "role": "reader"},
     )
     assert create_resp.status_code == 201
     user_id = create_resp.json()["id"]
@@ -66,7 +66,7 @@ def test_admin_can_toggle_user_status_and_prevent_login(client):
     password = "StatusPass!234"
     create_resp = client.post(
         "/users",
-        json={"username": username, "password": password, "role": "user"},
+        json={"username": username, "password": password, "role": "reader"},
     )
     assert create_resp.status_code == 201
     user_id = create_resp.json()["id"]
@@ -86,3 +86,31 @@ def test_admin_can_toggle_user_status_and_prevent_login(client):
     assert login_resp.status_code == 200
 
     client.delete(f"/users/{user_id}")
+
+
+def test_admin_cannot_assign_admin_roles_but_head_admin_can(client):
+    admin_create = client.post(
+        "/users",
+        headers={"X-Test-Role": "admin"},
+        json={"username": f"admin-made-{uuid.uuid4().hex[:8]}", "password": "AdminPass123!", "role": "admin"},
+    )
+    assert admin_create.status_code == 403
+
+    manager_create = client.post(
+        "/users",
+        headers={"X-Test-Role": "admin"},
+        json={"username": f"manager-made-{uuid.uuid4().hex[:8]}", "password": "AdminPass123!", "role": "manager"},
+    )
+    assert manager_create.status_code == 201
+    created_manager_id = manager_create.json()["id"]
+
+    head_admin_create = client.post(
+        "/users",
+        headers={"X-Test-Role": "head_admin"},
+        json={"username": f"head-made-{uuid.uuid4().hex[:8]}", "password": "HeadPass123!", "role": "admin"},
+    )
+    assert head_admin_create.status_code == 201
+    created_admin_id = head_admin_create.json()["id"]
+
+    client.delete(f"/users/{created_manager_id}")
+    client.delete(f"/users/{created_admin_id}")

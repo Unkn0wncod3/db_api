@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
-from .middleware.audit import register_audit_logging
-from .routers import audit, auth, persons, notes, platforms, profiles, person_links, vehicles, activities, views, stats, users
+from .routers import auth, entries, metadata_schemas, users
 from .services.users import ensure_default_admin
 
 app = FastAPI(title="DB Manager API")
@@ -16,20 +15,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-register_audit_logging(app)
 
-app.include_router(persons.router)
 app.include_router(auth.router)
 app.include_router(users.router)
-app.include_router(notes.router)
-app.include_router(platforms.router)
-app.include_router(profiles.router)
-app.include_router(person_links.router)
-app.include_router(vehicles.router)
-app.include_router(activities.router)
-app.include_router(views.router)
-app.include_router(stats.router)
-app.include_router(audit.router)
+app.include_router(metadata_schemas.router)
+app.include_router(entries.router)
 
 @app.get("/")
 def root():
