@@ -228,6 +228,15 @@ class EntryRepository:
 
 
 class RelationRepository:
+    def get_relation(self, relation_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM entry_relations WHERE id=%s;", (relation_id,))
+            row = cur.fetchone()
+        if not row:
+            raise NotFoundError("Relation not found")
+        row["metadata_json"] = row.get("metadata_json") or {}
+        return row
+
     def create_relation(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         record = dict(payload)
         record["metadata_json"] = Jsonb(record.get("metadata_json") or {})
@@ -259,6 +268,31 @@ class RelationRepository:
         for row in rows:
             row["metadata_json"] = row.get("metadata_json") or {}
         return rows
+
+    def update_relation(self, relation_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(updates)
+        if "metadata_json" in payload:
+            payload["metadata_json"] = Jsonb(payload.get("metadata_json") or {})
+        payload["relation_id"] = relation_id
+        assignments = ", ".join(f"{key}=%({key})s" for key in updates)
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(f"UPDATE entry_relations SET {assignments} WHERE id=%(relation_id)s RETURNING *;", payload)
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Relation not found")
+        row["metadata_json"] = row.get("metadata_json") or {}
+        return row
+
+    def delete_relation(self, relation_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM entry_relations WHERE id=%s RETURNING *;", (relation_id,))
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Relation not found")
+        row["metadata_json"] = row.get("metadata_json") or {}
+        return row
 
 
 class HistoryRepository:

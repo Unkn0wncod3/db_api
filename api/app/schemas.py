@@ -129,6 +129,13 @@ class EntryRelationCreate(BaseModel):
     metadata_json: Dict[str, Any] = Field(default_factory=dict)
 
 
+class EntryRelationUpdate(BaseModel):
+    to_entry_id: Optional[int] = None
+    relation_type: Optional[EntryRelationType] = None
+    sort_order: Optional[int] = None
+    metadata_json: Optional[Dict[str, Any]] = None
+
+
 class EntryHistoryRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

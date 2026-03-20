@@ -15,6 +15,8 @@ from ..schemas import (
     EntryHistoryRecord,
     EntryPermissionCreate,
     EntryRelationCreate,
+    EntryRelationResponse,
+    EntryRelationUpdate,
     EntryResponse,
     EntryUpdate,
 )
@@ -65,18 +67,39 @@ def get_history(entry_id: int, current_user: Optional[Dict] = Depends(get_option
     return entry_service.list_history(entry_id, current_user=current_user)
 
 
-@router.get("/{entry_id}/relations")
+@router.get("/{entry_id}/relations", response_model=list[EntryRelationResponse])
 def list_relations(entry_id: int, current_user: Optional[Dict] = Depends(get_optional_current_user)):
     entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.READ)
     return relation_service.list_relations(entry_id)
 
 
-@router.post("/{entry_id}/relations", status_code=201)
+@router.post("/{entry_id}/relations", response_model=EntryRelationResponse, status_code=201)
 def create_relation(entry_id: int, payload: EntryRelationCreate, current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES))):
     entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_RELATIONS)
     relation_payload = payload.model_dump()
     relation_payload["from_entry_id"] = entry_id
     return relation_service.create_relation(relation_payload)
+
+
+@router.patch("/{entry_id}/relations/{relation_id}", response_model=EntryRelationResponse)
+def update_relation(
+    entry_id: int,
+    relation_id: int,
+    payload: EntryRelationUpdate,
+    current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES)),
+):
+    entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_RELATIONS)
+    return relation_service.update_relation(entry_id, relation_id, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/{entry_id}/relations/{relation_id}", response_model=EntryRelationResponse)
+def delete_relation(
+    entry_id: int,
+    relation_id: int,
+    current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES)),
+):
+    entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_RELATIONS)
+    return relation_service.delete_relation(entry_id, relation_id)
 
 
 @router.get("/{entry_id}/permissions")
