@@ -122,6 +122,21 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+) -> Optional[Dict[str, Any]]:
+    if credentials is None:
+        request.state.current_user = None
+        return None
+    user = resolve_user_from_token(credentials.credentials)
+    if not user:
+        request.state.current_user = None
+        return None
+    request.state.current_user = user
+    return user
+
+
 def require_role(*roles: str) -> Callable:
     if not roles:
         raise ValueError("At least one role must be provided")

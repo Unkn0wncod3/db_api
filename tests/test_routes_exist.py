@@ -4,6 +4,9 @@ def test_routes_endpoint_lists_routes(client):
     assert isinstance(r.json(), list)
     paths = {item["path"] for item in r.json()}
     assert "/" in paths
+    assert "/schemas" in paths
+    assert "/entries" in paths
+    assert "/users" in paths
 
 def test_openapi_contains_expected_prefixes(client):
     r = client.get("/openapi.json")
@@ -13,8 +16,8 @@ def test_openapi_contains_expected_prefixes(client):
     all_paths = set(paths.keys())
 
     expected_prefixes = [
-    "/persons", "/notes", "/platforms", "/profiles", "/vehicles", "/activities", "/views"
-]
+        "/auth", "/users", "/schemas", "/entries",
+    ]
     missing = []
     for prefix in expected_prefixes:
         if not any(p == prefix or p.startswith(prefix + "/") for p in all_paths):

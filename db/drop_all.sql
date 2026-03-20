@@ -3,23 +3,19 @@
 BEGIN;
 
 -- 1) Views 
-DROP VIEW IF EXISTS v_person_timeline      CASCADE;
-DROP VIEW IF EXISTS v_person_profiles      CASCADE;
-DROP VIEW IF EXISTS v_person_summary       CASCADE;
-
--- 2) Tables
-DROP TABLE IF EXISTS activities            CASCADE;
-DROP TABLE IF EXISTS notes                 CASCADE;
-DROP TABLE IF EXISTS person_profile_map    CASCADE;
-DROP TABLE IF EXISTS vehicles              CASCADE;
-DROP TABLE IF EXISTS profiles              CASCADE;
-DROP TABLE IF EXISTS platforms             CASCADE;
-DROP TABLE IF EXISTS persons               CASCADE;
-DROP TABLE IF EXISTS audit_logs            CASCADE;
-DROP TABLE IF EXISTS users                 CASCADE;
+DROP TABLE IF EXISTS attachments          CASCADE;
+DROP TABLE IF EXISTS entry_permissions    CASCADE;
+DROP TABLE IF EXISTS entry_history        CASCADE;
+DROP TABLE IF EXISTS entry_relations      CASCADE;
+DROP TABLE IF EXISTS entries              CASCADE;
+DROP TABLE IF EXISTS fields               CASCADE;
+DROP TABLE IF EXISTS schemas              CASCADE;
+DROP TABLE IF EXISTS users                CASCADE;
 
 -- 3) Trigger
 DROP FUNCTION IF EXISTS set_updated_at()   CASCADE;
+DROP TYPE IF EXISTS entry_permission_enum  CASCADE;
+DROP TYPE IF EXISTS permission_subject_type_enum CASCADE;
+DROP TYPE IF EXISTS field_data_type_enum   CASCADE;
 DROP TYPE IF EXISTS visibility_level_enum  CASCADE;
-
 COMMIT;

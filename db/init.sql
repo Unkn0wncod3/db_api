@@ -1,12 +1,3 @@
--- ================================
--- 1-init_extended.sql — Core Schema 
--- ================================
-
--- Optional, NUR DEV:
--- DROP SCHEMA public CASCADE;
--- CREATE SCHEMA public;
-
--- ---------- Utility: updated_at automatisch setzen ----------
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -15,25 +6,41 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ---------- Visibility Level Enum ----------
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_type WHERE typname = 'visibility_level_enum'
-  ) THEN
-    CREATE TYPE visibility_level_enum AS ENUM ('admin', 'user');
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'visibility_level_enum') THEN
+    CREATE TYPE visibility_level_enum AS ENUM ('private', 'internal', 'restricted', 'public');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'field_data_type_enum') THEN
+    CREATE TYPE field_data_type_enum AS ENUM (
+      'text', 'long_text', 'integer', 'decimal', 'boolean', 'date', 'datetime',
+      'email', 'url', 'select', 'multi_select', 'reference', 'file', 'json'
+    );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'permission_subject_type_enum') THEN
+    CREATE TYPE permission_subject_type_enum AS ENUM ('user', 'role', 'group');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'entry_permission_enum') THEN
+    CREATE TYPE entry_permission_enum AS ENUM ('read');
   END IF;
 END;
 $$ LANGUAGE plpgsql;
 
--- ============================================================
--- Users & Roles
--- ============================================================
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'view_history';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'edit';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'edit_status';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'edit_visibility';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'manage_relations';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'manage_attachments';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'manage_permissions';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'delete';
+ALTER TYPE entry_permission_enum ADD VALUE IF NOT EXISTS 'manage';
+
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('head_admin', 'admin', 'editor', 'user')),
+    role TEXT NOT NULL DEFAULT 'reader' CHECK (role IN ('head_admin', 'admin', 'manager', 'editor', 'reader')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     profile_picture_url TEXT,
     preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -43,308 +50,136 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
 
+DROP TRIGGER IF EXISTS trg_users_updated ON users;
 CREATE TRIGGER trg_users_updated
 BEFORE UPDATE ON users
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- Audit Logs capture per-request activity for accountability
-CREATE TABLE IF NOT EXISTS audit_logs (
+CREATE TABLE IF NOT EXISTS schemas (
     id BIGSERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id) ON DELETE SET NULL,
-    username TEXT,
-    role TEXT,
-    action TEXT NOT NULL,
-    resource TEXT,
-    resource_id BIGINT,
-    method TEXT NOT NULL,
-    path TEXT NOT NULL,
-    status_code INT NOT NULL,
-    ip_address TEXT,
-    user_agent TEXT,
-    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    key TEXT NOT NULL UNIQUE CHECK (key ~ '^[a-z][a-z0-9_]*$'),
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_time ON audit_logs (user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
-
--- ============================================================
--- Personen
--- ============================================================
-CREATE TABLE IF NOT EXISTS persons (
-    id SERIAL PRIMARY KEY,
-
-    -- Basic
-    first_name        TEXT        NOT NULL DEFAULT 'Unknown',
-    last_name         TEXT        NOT NULL DEFAULT 'Unknown',
-    date_of_birth     DATE,
-    gender            TEXT        NOT NULL DEFAULT 'Unspecified',
-
-    -- Kontakt
-    email             TEXT        NOT NULL DEFAULT 'not_provided@example.com',
-    phone_number      TEXT        NOT NULL DEFAULT 'N/A',
-
-    -- Adresse (optional feiner aufgeteilt)
-    address_line1     TEXT,
-    address_line2     TEXT,
-    postal_code       TEXT,
-    city              TEXT,
-    region_state      TEXT,
-    country           TEXT,
-
-    -- Admin / Lifecycle
-    status            TEXT        NOT NULL DEFAULT 'active', -- active|inactive|archived
-    archived_at       TIMESTAMPTZ,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at        TIMESTAMPTZ,
-
-    -- Optionale Metadaten
-    nationality       TEXT,
-    occupation        TEXT,
-    risk_level        TEXT,                              -- z.B. low|medium|high
-    tags              TEXT[] DEFAULT '{}',               -- freie Tagging-Liste
-    notes             TEXT,                              -- freie Langnotiz
-    metadata          JSONB DEFAULT '{}'::jsonb,         -- flexible Zusatzdaten
-    visibility_level  visibility_level_enum NOT NULL DEFAULT 'user'
-);
-
-CREATE INDEX IF NOT EXISTS idx_persons_last_first
-  ON persons (last_name, first_name);
-CREATE INDEX IF NOT EXISTS idx_persons_tags_gin
-  ON persons USING GIN (tags);
-CREATE INDEX IF NOT EXISTS idx_persons_metadata_gin
-  ON persons USING GIN (metadata);
-
-CREATE TRIGGER trg_persons_updated
-BEFORE UPDATE ON persons
+DROP TRIGGER IF EXISTS trg_schemas_updated ON schemas;
+CREATE TRIGGER trg_schemas_updated
+BEFORE UPDATE ON schemas
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- ============================================================
--- Notizen (frei)
--- ============================================================
-CREATE TABLE IF NOT EXISTS notes (
-    id SERIAL PRIMARY KEY,
-    person_id INT REFERENCES persons(id) ON DELETE CASCADE,
-    title TEXT,
-    text TEXT NOT NULL,
-    pinned BOOLEAN NOT NULL DEFAULT FALSE,
+CREATE TABLE IF NOT EXISTS fields (
+    id BIGSERIAL PRIMARY KEY,
+    schema_id BIGINT NOT NULL REFERENCES schemas(id) ON DELETE CASCADE,
+    key TEXT NOT NULL CHECK (key ~ '^[a-z][a-z0-9_]*$'),
+    label TEXT NOT NULL,
+    description TEXT,
+    data_type field_data_type_enum NOT NULL,
+    is_required BOOLEAN NOT NULL DEFAULT FALSE,
+    is_unique BOOLEAN NOT NULL DEFAULT FALSE,
+    default_value JSONB,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    validation_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    settings_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
+    CONSTRAINT uq_fields_schema_key UNIQUE (schema_id, key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_notes_person
-  ON notes (person_id);
-CREATE TRIGGER trg_notes_updated
-BEFORE UPDATE ON notes
+CREATE INDEX IF NOT EXISTS idx_fields_schema_sort ON fields (schema_id, sort_order, id);
+CREATE INDEX IF NOT EXISTS idx_fields_validation_json ON fields USING GIN (validation_json);
+CREATE INDEX IF NOT EXISTS idx_fields_settings_json ON fields USING GIN (settings_json);
+
+DROP TRIGGER IF EXISTS trg_fields_updated ON fields;
+CREATE TRIGGER trg_fields_updated
+BEFORE UPDATE ON fields
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- ============================================================
--- Plattformen
--- ============================================================
-CREATE TABLE IF NOT EXISTS platforms (
-    id SERIAL PRIMARY KEY,
-    name         TEXT NOT NULL,        -- "Discord", "Steam", ...
-    category     TEXT NOT NULL DEFAULT 'social', -- social|gaming|forum|other
-    base_url     TEXT,
-    api_base_url TEXT,
-    is_active    BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
+CREATE TABLE IF NOT EXISTS entries (
+    id BIGSERIAL PRIMARY KEY,
+    schema_id BIGINT NOT NULL REFERENCES schemas(id) ON DELETE RESTRICT,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    visibility_level visibility_level_enum NOT NULL DEFAULT 'private',
+    owner_id INT REFERENCES users(id) ON DELETE SET NULL,
+    created_by INT REFERENCES users(id) ON DELETE SET NULL,
+    data_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ,
+    archived_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_platforms_name
-  ON platforms (LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_entries_schema_status ON entries (schema_id, status);
+CREATE INDEX IF NOT EXISTS idx_entries_owner ON entries (owner_id);
+CREATE INDEX IF NOT EXISTS idx_entries_visibility ON entries (visibility_level);
+CREATE INDEX IF NOT EXISTS idx_entries_data_json ON entries USING GIN (data_json);
 
-CREATE TRIGGER trg_platforms_updated
-BEFORE UPDATE ON platforms
+DROP TRIGGER IF EXISTS trg_entries_updated ON entries;
+CREATE TRIGGER trg_entries_updated
+BEFORE UPDATE ON entries
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- ============================================================
--- Profile (Konto auf einer Plattform)
--- ============================================================
-CREATE TABLE IF NOT EXISTS profiles (
-    id SERIAL PRIMARY KEY,
-    platform_id    INT NOT NULL REFERENCES platforms(id) ON DELETE CASCADE,
-    username       TEXT NOT NULL,
-    external_id    TEXT,
-    display_name   TEXT,
-    url            TEXT,
-    status         TEXT NOT NULL DEFAULT 'active', -- active|inactive|banned|archived
-
-    -- optionale Felder
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ,
-    last_seen_at   TIMESTAMPTZ,
-    language       TEXT,                 -- z.B. "de", "en"
-    region         TEXT,                 -- z.B. "EU", "NA"
-    is_verified    BOOLEAN DEFAULT FALSE,
-    avatar_url     TEXT,
-    bio            TEXT,
-    metadata       JSONB DEFAULT '{}'::jsonb,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
+CREATE TABLE IF NOT EXISTS entry_relations (
+    id BIGSERIAL PRIMARY KEY,
+    from_entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    to_entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    relation_type TEXT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_entry_relations_no_self CHECK (from_entry_id <> to_entry_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_platform_username
-  ON profiles (platform_id, LOWER(username));
-CREATE INDEX IF NOT EXISTS idx_profiles_external
-  ON profiles (platform_id, external_id);
-CREATE INDEX IF NOT EXISTS idx_profiles_last_seen
-  ON profiles (last_seen_at DESC);
-CREATE INDEX IF NOT EXISTS idx_profiles_metadata_gin
-  ON profiles USING GIN (metadata);
+CREATE INDEX IF NOT EXISTS idx_entry_relations_from ON entry_relations (from_entry_id, relation_type);
+CREATE INDEX IF NOT EXISTS idx_entry_relations_to ON entry_relations (to_entry_id, relation_type);
+CREATE INDEX IF NOT EXISTS idx_entry_relations_metadata ON entry_relations USING GIN (metadata_json);
 
-CREATE TRIGGER trg_profiles_updated
-BEFORE UPDATE ON profiles
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- ============================================================
--- Zuordnung Person <-> Profile (Many-to-Many)
--- ============================================================
-CREATE TABLE IF NOT EXISTS person_profile_map (
-    person_id   INT NOT NULL REFERENCES persons(id)   ON DELETE CASCADE,
-    profile_id  INT NOT NULL REFERENCES profiles(id)  ON DELETE CASCADE,
-    linked_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    note        TEXT,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user',
-    PRIMARY KEY (person_id, profile_id)
+CREATE TABLE IF NOT EXISTS entry_history (
+    id BIGSERIAL PRIMARY KEY,
+    entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    changed_by INT REFERENCES users(id) ON DELETE SET NULL,
+    change_type TEXT NOT NULL,
+    old_data_json JSONB,
+    new_data_json JSONB,
+    old_visibility_level visibility_level_enum,
+    new_visibility_level visibility_level_enum,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    comment TEXT
 );
 
--- ============================================================
--- Fahrzeuge
--- ============================================================
-CREATE TABLE IF NOT EXISTS vehicles (
-    id SERIAL PRIMARY KEY,
-    label          TEXT NOT NULL,     -- "Car XY"
-    make           TEXT,
-    model          TEXT,
-    build_year     INT,
-    license_plate  TEXT,
-    vin            TEXT,
-    vehicle_type   TEXT,              -- car|truck|van|bike|other
-    energy_type    TEXT,              -- petrol|diesel|electric|hybrid|other
-    color          TEXT,
-    mileage_km     INT,
-    last_service_at TIMESTAMPTZ,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ,
-    metadata       JSONB DEFAULT '{}'::jsonb,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user'
+CREATE INDEX IF NOT EXISTS idx_entry_history_entry_time ON entry_history (entry_id, changed_at DESC);
+
+CREATE TABLE IF NOT EXISTS attachments (
+    id BIGSERIAL PRIMARY KEY,
+    entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    stored_path TEXT NOT NULL CHECK (stored_path ~ '^https?://'),
+    mime_type TEXT,
+    file_size BIGINT NOT NULL CHECK (file_size >= 0),
+    checksum TEXT NOT NULL,
+    uploaded_by INT REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    description TEXT,
+    CONSTRAINT uq_attachments_entry_checksum UNIQUE (entry_id, checksum)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_vehicles_license_plate
-  ON vehicles (license_plate) WHERE license_plate IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_vehicles_type_energy
-  ON vehicles (vehicle_type, energy_type);
-CREATE INDEX IF NOT EXISTS idx_vehicles_metadata_gin
-  ON vehicles USING GIN (metadata);
+CREATE INDEX IF NOT EXISTS idx_attachments_entry ON attachments (entry_id, uploaded_at DESC);
 
-CREATE TRIGGER trg_vehicles_updated
-BEFORE UPDATE ON vehicles
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- ============================================================
--- Aktivitäten / Verlauf
--- ============================================================
-CREATE TABLE IF NOT EXISTS activities (
-    id SERIAL PRIMARY KEY,
-    person_id     INT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
-    activity_type TEXT NOT NULL,                -- z.B. drive|login|post|join_community|custom
-    occurred_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    -- optionale Targets
-    vehicle_id    INT REFERENCES vehicles(id)    ON DELETE SET NULL,
-    profile_id    INT REFERENCES profiles(id)    ON DELETE SET NULL,
-
-    item          TEXT,
-    notes         TEXT,
-    details       JSONB DEFAULT '{}'::jsonb,     -- flexible Zusatzdaten
-
-    -- optionale Kontextfelder
-    severity      TEXT,                          -- info|warn|error|critical
-    source        TEXT,                          -- manual|api|import|system
-    ip_address    INET,
-    user_agent    TEXT,
-    geo_location  TEXT,                          -- "Berlin, DE" o.ä.
-    created_by    TEXT,                          -- Benutzername/System
-    updated_at    TIMESTAMPTZ,
-    visibility_level visibility_level_enum NOT NULL DEFAULT 'user',
-
-    -- Mindestens EIN Target-Feld sollte befüllt sein
-    CONSTRAINT chk_activities_target CHECK (
-        vehicle_id IS NOT NULL OR profile_id IS NOT NULL OR item IS NOT NULL
-    )
+CREATE TABLE IF NOT EXISTS entry_permissions (
+    id BIGSERIAL PRIMARY KEY,
+    entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    subject_type permission_subject_type_enum NOT NULL,
+    subject_id TEXT NOT NULL,
+    permission entry_permission_enum NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by INT REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT uq_entry_permissions UNIQUE (entry_id, subject_type, subject_id, permission)
 );
 
-CREATE INDEX IF NOT EXISTS idx_activities_person_time
-  ON activities (person_id, occurred_at DESC);
-CREATE INDEX IF NOT EXISTS idx_activities_gin_details
-  ON activities USING GIN (details);
-CREATE INDEX IF NOT EXISTS idx_activities_severity
-  ON activities (severity);
-
-CREATE TRIGGER trg_activities_updated
-BEFORE UPDATE ON activities
-FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- ============================================================
--- Nützliche Views
--- ============================================================
-
--- 1) Vereinfachter Verlauf je Person
-CREATE OR REPLACE VIEW v_person_timeline AS
-SELECT
-  a.id AS activity_id,
-  a.occurred_at,
-  per.id AS person_id,
-  per.first_name || ' ' || per.last_name AS person_name,
-  a.activity_type,
-  COALESCE(v.label, pr.username, a.item, 'N/A') AS target,
-  a.severity,
-  a.source,
-  a.geo_location,
-  a.notes,
-  a.details,
-  per.visibility_level AS person_visibility_level,
-  a.visibility_level   AS activity_visibility_level
-FROM activities a
-JOIN persons per ON per.id = a.person_id
-LEFT JOIN vehicles v ON v.id = a.vehicle_id
-LEFT JOIN profiles pr ON pr.id = a.profile_id;
-
--- 2) Schneller Überblick über Profile einer Person
-CREATE OR REPLACE VIEW v_person_profiles AS
-SELECT
-  ppm.person_id,
-  pf.name        AS platform,
-  pr.username,
-  pr.display_name,
-  pr.status,
-  pr.last_seen_at,
-  pr.url,
-  ppm.visibility_level AS link_visibility_level,
-  pr.visibility_level  AS profile_visibility_level,
-  pf.visibility_level  AS platform_visibility_level,
-  per.visibility_level AS person_visibility_level
-FROM person_profile_map ppm
-JOIN persons per ON per.id = ppm.person_id
-JOIN profiles pr  ON pr.id = ppm.profile_id
-JOIN platforms pf ON pf.id = pr.platform_id;
-
--- 3) Personen-Summary mit Anzahl verknüpfter Entitäten
-CREATE OR REPLACE VIEW v_person_summary AS
-SELECT
-  p.id AS person_id,
-  p.first_name || ' ' || p.last_name AS person_name,
-  p.email,
-  p.status,
-  p.visibility_level,
-  COUNT(DISTINCT ppm.profile_id)    AS profiles_count,
-  COUNT(DISTINCT a.id)              AS activities_count,
-  COUNT(DISTINCT n.id)              AS notes_count
-FROM persons p
-LEFT JOIN person_profile_map ppm ON ppm.person_id = p.id
-LEFT JOIN activities a          ON a.person_id   = p.id
-LEFT JOIN notes n               ON n.person_id   = p.id
-GROUP BY p.id, p.first_name, p.last_name, p.email, p.status, p.visibility_level;
+CREATE INDEX IF NOT EXISTS idx_entry_permissions_entry ON entry_permissions (entry_id);
+CREATE INDEX IF NOT EXISTS idx_entry_permissions_subject ON entry_permissions (subject_type, subject_id);

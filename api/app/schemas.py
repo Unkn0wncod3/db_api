@@ -1,196 +1,169 @@
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
-from .visibility import VisibilityLevel, VISIBILITY_USER
+from __future__ import annotations
 
-# -------- Persons --------
-class PersonCreate(BaseModel):
-    first_name: str = Field(..., min_length=1)
-    last_name: str = Field(..., min_length=1)
-    date_of_birth: Optional[date] = None
-    gender: str = "Unspecified"
-    email: str = "not_provided@example.com"
-    phone_number: str = "N/A"
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
-    postal_code: Optional[str] = None
-    city: Optional[str] = None
-    region_state: Optional[str] = None
-    country: Optional[str] = None
-    status: str = "active"
-    nationality: Optional[str] = None
-    occupation: Optional[str] = None
-    risk_level: Optional[str] = None
-    tags: Optional[List[str]] = Field(default_factory=list)
-    notes: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    visibility_level: VisibilityLevel = VISIBILITY_USER
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
-class PersonUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    date_of_birth: Optional[date] = None
-    gender: Optional[str] = None
-    email: Optional[str] = None
-    phone_number: Optional[str] = None
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
-    postal_code: Optional[str] = None
-    city: Optional[str] = None
-    region_state: Optional[str] = None
-    country: Optional[str] = None
-    status: Optional[str] = None
-    archived_at: Optional[datetime] = None
-    nationality: Optional[str] = None
-    occupation: Optional[str] = None
-    risk_level: Optional[str] = None
-    tags: Optional[List[str]] = None
-    notes: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    visibility_level: Optional[VisibilityLevel] = None
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-# -------- Notes --------
-class NoteCreate(BaseModel):
-    title: Optional[str] = None
-    text: str
-    pinned: bool = False
-    visibility_level: VisibilityLevel = VISIBILITY_USER
+from .core.enums import (
+    EntryChangeType,
+    EntryPermission,
+    EntryRelationType,
+    FieldDataType,
+    PermissionSubjectType,
+    VisibilityLevel,
+)
 
-class NoteUpdate(BaseModel):
-    title: Optional[str] = None
-    text: Optional[str] = None
-    pinned: Optional[bool] = None
-    visibility_level: Optional[VisibilityLevel] = None
 
-# -------- Platforms --------
-class PlatformCreate(BaseModel):
-    name: str
-    category: str = "social"
-    base_url: Optional[str] = None
-    api_base_url: Optional[str] = None
+class FieldDefinitionBase(BaseModel):
+    key: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$")
+    label: str = Field(..., min_length=1, max_length=120)
+    description: Optional[str] = None
+    data_type: FieldDataType
+    is_required: bool = False
+    is_unique: bool = False
+    default_value: Optional[Any] = None
+    sort_order: int = 0
     is_active: bool = True
-    visibility_level: VisibilityLevel = VISIBILITY_USER
+    validation_json: Dict[str, Any] = Field(default_factory=dict)
+    settings_json: Dict[str, Any] = Field(default_factory=dict)
 
-class PlatformUpdate(BaseModel):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    base_url: Optional[str] = None
-    api_base_url: Optional[str] = None
-    is_active: Optional[bool] = None
+
+class FieldDefinitionCreate(FieldDefinitionBase):
+    pass
+
+
+class FieldDefinitionResponse(FieldDefinitionBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    schema_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class MetadataSchemaBase(BaseModel):
+    key: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$")
+    name: str = Field(..., min_length=1, max_length=120)
+    description: Optional[str] = None
+    icon: Optional[str] = Field(default=None, max_length=64)
+    is_active: bool = True
+
+
+class MetadataSchemaCreate(MetadataSchemaBase):
+    pass
+
+
+class MetadataSchemaResponse(MetadataSchemaBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    fields: List[FieldDefinitionResponse] = Field(default_factory=list)
+
+
+class EntryBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    status: str = Field(default="draft", min_length=1, max_length=64)
+    visibility_level: VisibilityLevel = VisibilityLevel.PRIVATE
+    owner_id: Optional[int] = None
+    data_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EntryCreate(EntryBase):
+    schema_id: int
+    archived_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+
+
+class EntryUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=64)
     visibility_level: Optional[VisibilityLevel] = None
+    owner_id: Optional[int] = None
+    data_json: Optional[Dict[str, Any]] = None
+    archived_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+    comment: Optional[str] = Field(default=None, max_length=500)
 
-# -------- Profiles --------
-class ProfileCreate(BaseModel):
-    platform_id: int
-    username: str
-    external_id: Optional[str] = None
-    display_name: Optional[str] = None
-    url: Optional[str] = None
-    status: str = "active"
-    last_seen_at: Optional[datetime] = None
-    language: Optional[str] = None
-    region: Optional[str] = None
-    is_verified: bool = False
-    avatar_url: Optional[str] = None
-    bio: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    visibility_level: VisibilityLevel = VISIBILITY_USER
 
-class ProfileUpdate(BaseModel):
-    platform_id: Optional[int] = None
-    username: Optional[str] = None
-    external_id: Optional[str] = None
-    display_name: Optional[str] = None
-    url: Optional[str] = None
-    status: Optional[str] = None
-    last_seen_at: Optional[datetime] = None
-    language: Optional[str] = None
-    region: Optional[str] = None
-    is_verified: Optional[bool] = None
-    avatar_url: Optional[str] = None
-    bio: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    visibility_level: Optional[VisibilityLevel] = None
+class EntryResponse(EntryBase):
+    model_config = ConfigDict(from_attributes=True)
 
-# -------- Person ↔ Profile --------
-class LinkProfilePayload(BaseModel):
-    profile_id: int
-    note: Optional[str] = None
-    visibility_level: Optional[VisibilityLevel] = None
+    id: int
+    schema_id: int
+    created_by: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
 
-# -------- Vehicles --------
-class VehicleCreate(BaseModel):
-    label: str
-    make: Optional[str] = None
-    model: Optional[str] = None
-    build_year: Optional[int] = None
-    license_plate: Optional[str] = None
-    vin: Optional[str] = None
-    vehicle_type: Optional[str] = None
-    energy_type: Optional[str] = None
-    color: Optional[str] = None
-    mileage_km: Optional[int] = None
-    last_service_at: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    visibility_level: VisibilityLevel = VISIBILITY_USER
 
-class VehicleUpdate(BaseModel):
-    label: Optional[str] = None
-    make: Optional[str] = None
-    model: Optional[str] = None
-    build_year: Optional[int] = None
-    license_plate: Optional[str] = None
-    vin: Optional[str] = None
-    vehicle_type: Optional[str] = None
-    energy_type: Optional[str] = None
-    color: Optional[str] = None
-    mileage_km: Optional[int] = None
-    last_service_at: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = None
-    visibility_level: Optional[VisibilityLevel] = None
+class EntryRelationCreate(BaseModel):
+    to_entry_id: int
+    relation_type: EntryRelationType = EntryRelationType.RELATED_TO
+    sort_order: int = 0
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
 
-# -------- Activities --------
-class ActivityCreate(BaseModel):
-    person_id: int
-    activity_type: str
-    occurred_at: Optional[datetime] = None
-    vehicle_id: Optional[int] = None
-    profile_id: Optional[int] = None
-    item: Optional[str] = None
-    notes: Optional[str] = None
-    details: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    severity: Optional[str] = None
-    source: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    geo_location: Optional[str] = None
-    created_by: Optional[str] = None
-    visibility_level: VisibilityLevel = VISIBILITY_USER
 
-class ActivityUpdate(BaseModel):
-    person_id: Optional[int] = None
-    activity_type: Optional[str] = None
-    occurred_at: Optional[datetime] = None
-    vehicle_id: Optional[int] = None
-    profile_id: Optional[int] = None
-    item: Optional[str] = None
-    notes: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-    severity: Optional[str] = None
-    source: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    geo_location: Optional[str] = None
-    created_by: Optional[str] = None
-    visibility_level: Optional[VisibilityLevel] = None
+class EntryHistoryRecord(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-# -------- Users & Auth --------
-Role = Literal["head_admin", "admin", "editor", "user"]
+    id: int
+    entry_id: int
+    changed_by: Optional[int] = None
+    change_type: EntryChangeType
+    old_data_json: Dict[str, Any] = Field(default_factory=dict)
+    new_data_json: Dict[str, Any] = Field(default_factory=dict)
+    old_visibility_level: Optional[VisibilityLevel] = None
+    new_visibility_level: Optional[VisibilityLevel] = None
+    changed_at: datetime
+    comment: Optional[str] = None
+
+
+class AttachmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    entry_id: int
+    file_name: str
+    stored_path: str
+    mime_type: Optional[str] = None
+    file_size: int
+    checksum: str
+    uploaded_by: Optional[int] = None
+    uploaded_at: datetime
+    description: Optional[str] = None
+
+
+class AttachmentLinkCreate(BaseModel):
+    file_name: str = Field(..., min_length=1, max_length=255)
+    external_url: HttpUrl
+    mime_type: Optional[str] = Field(default=None, max_length=255)
+    file_size: int = Field(default=0, ge=0)
+    checksum: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+
+
+class EntryPermissionCreate(BaseModel):
+    subject_type: PermissionSubjectType
+    subject_id: str
+    permission: EntryPermission
+
+
+class AccessCheckResponse(BaseModel):
+    entry_id: int
+    permission: EntryPermission
+    allowed: bool
+
+
+Role = Literal["head_admin", "admin", "manager", "editor", "reader"]
 
 
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
-    role: Role = "user"
+    role: Role = "reader"
     profile_picture_url: Optional[str] = Field(default=None, max_length=1024)
     preferences: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
@@ -229,29 +202,6 @@ class UserListResponse(BaseModel):
     offset: int
 
 
-class AuditLogEntry(BaseModel):
-    id: int
-    user_id: Optional[int] = None
-    username: Optional[str] = None
-    role: Optional[str] = None
-    action: str
-    resource: Optional[str] = None
-    resource_id: Optional[int] = None
-    method: str
-    path: str
-    status_code: int
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime
-
-
-class AuditLogListResponse(BaseModel):
-    items: List[AuditLogEntry]
-    limit: int
-    offset: int
-
-
 class AuthLoginRequest(BaseModel):
     username: str
     password: str
@@ -261,118 +211,3 @@ class AuthLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
-
-
-# -------- Person Dossier --------
-class PersonDossierProfile(BaseModel):
-    id: int
-    platform_id: Optional[int] = None
-    platform_name: Optional[str] = None
-    username: str
-    display_name: Optional[str] = None
-    status: Optional[str] = None
-    visibility_level: VisibilityLevel
-    link_visibility_level: VisibilityLevel
-    linked_at: datetime
-    last_seen_at: Optional[datetime] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-
-class PersonDossierNote(BaseModel):
-    id: int
-    title: Optional[str] = None
-    text: str
-    pinned: bool
-    visibility_level: VisibilityLevel
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-
-class PersonDossierActivity(BaseModel):
-    id: int
-    person_id: int
-    activity_type: str
-    occurred_at: datetime
-    notes: Optional[str] = None
-    severity: Optional[str] = None
-    source: Optional[str] = None
-    visibility_level: VisibilityLevel
-    created_by: Optional[str] = None
-    updated_at: Optional[datetime] = None
-
-
-class PersonDossierRelations(BaseModel):
-    profiles: List[PersonDossierProfile]
-    notes: List[PersonDossierNote]
-    activities: List[PersonDossierActivity]
-
-
-class PersonDossierStatsSection(BaseModel):
-    total: int
-    last_updated_at: Optional[datetime] = None
-
-
-class PersonDossierStats(BaseModel):
-    profiles: PersonDossierStatsSection
-    notes: PersonDossierStatsSection
-    activities: PersonDossierStatsSection
-
-
-class PersonDossierPerson(BaseModel):
-    id: int
-    first_name: str
-    last_name: str
-    date_of_birth: Optional[date] = None
-    gender: Optional[str] = None
-    email: Optional[str] = None
-    phone_number: Optional[str] = None
-    city: Optional[str] = None
-    region_state: Optional[str] = None
-    country: Optional[str] = None
-    status: Optional[str] = None
-    risk_level: Optional[str] = None
-    tags: List[Any] = Field(default_factory=list)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    visibility_level: VisibilityLevel
-    visibility_scope: List[VisibilityLevel]
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    archived_at: Optional[datetime] = None
-    nationality: Optional[str] = None
-    occupation: Optional[str] = None
-
-
-class PersonDossierActivitySummary(BaseModel):
-    id: int
-    activity_type: str
-    occurred_at: datetime
-    visibility_level: VisibilityLevel
-    notes: Optional[str] = None
-    severity: Optional[str] = None
-
-
-class PersonDossierAudit(BaseModel):
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    created_by: Optional[str] = None
-    last_activity: Optional[PersonDossierActivitySummary] = None
-
-
-class PersonDossierMetaLimits(BaseModel):
-    profiles: int
-    notes: int
-    activities: int
-
-
-class PersonDossierMeta(BaseModel):
-    can_view_admin_sections: bool
-    limits: PersonDossierMetaLimits
-
-
-class PersonDossierResponse(BaseModel):
-    person: PersonDossierPerson
-    relations: PersonDossierRelations
-    stats: PersonDossierStats
-    audit: PersonDossierAudit
-    meta: PersonDossierMeta
