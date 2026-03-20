@@ -158,6 +158,47 @@ class AccessCheckResponse(BaseModel):
     allowed: bool
 
 
+class EntryWithAccessResponse(EntryResponse):
+    access: Dict[str, bool] = Field(default_factory=dict)
+
+
+class SchemaEntriesResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_definition: MetadataSchemaResponse = Field(validation_alias="schema", serialization_alias="schema")
+    entries: List[EntryWithAccessResponse] = Field(default_factory=list)
+
+
+class DashboardEntrySummary(BaseModel):
+    id: int
+    schema_id: int
+    schema_key: str
+    schema_name: str
+    title: str
+    status: str
+    visibility_level: VisibilityLevel
+    owner_id: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class DashboardSchemaTotal(BaseModel):
+    schema_id: int
+    schema_key: str
+    schema_name: str
+    icon: Optional[str] = None
+    total_entries: int
+    last_created_at: Optional[datetime] = None
+    last_updated_at: Optional[datetime] = None
+
+
+class DashboardOverviewResponse(BaseModel):
+    total_entries: int
+    latest_created: List[DashboardEntrySummary] = Field(default_factory=list)
+    latest_updated: List[DashboardEntrySummary] = Field(default_factory=list)
+    totals_per_schema: List[DashboardSchemaTotal] = Field(default_factory=list)
+
+
 Role = Literal["head_admin", "admin", "manager", "editor", "reader"]
 
 

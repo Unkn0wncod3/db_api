@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, Query
 
 from ..roles import READ_ROLES, SCHEMA_WRITE_ROLES
-from ..schemas import FieldDefinitionCreate, MetadataSchemaCreate, MetadataSchemaResponse
-from ..security import require_role
+from ..schemas import FieldDefinitionCreate, MetadataSchemaCreate, MetadataSchemaResponse, SchemaEntriesResponse
+from ..security import get_optional_current_user, require_role
 from ..services.metadata_schema import MetadataSchemaService
 
 router = APIRouter(prefix="/schemas", tags=["schemas"])
@@ -25,6 +25,11 @@ def list_schemas(
 @router.get("/{schema_id}", response_model=MetadataSchemaResponse)
 def get_schema(schema_id: int, _: Dict = Depends(require_role(*READ_ROLES))):
     return service.get_schema(schema_id)
+
+
+@router.get("/{schema_id}/entries", response_model=SchemaEntriesResponse)
+def get_schema_entries(schema_id: int, current_user: Optional[Dict] = Depends(get_optional_current_user)):
+    return service.get_schema_entries(schema_id, current_user=current_user)
 
 
 @router.post("", response_model=MetadataSchemaResponse, status_code=201)

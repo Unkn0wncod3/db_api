@@ -2,7 +2,7 @@ import pytest
 
 def _get_all_get_paths_static():
     return [
-        "/", "/schemas", "/entries", "/users", "/auth/me"
+        "/", "/dashboard", "/schemas", "/entries", "/users", "/auth/me"
     ]
 
 @pytest.mark.parametrize("path", _get_all_get_paths_static())
