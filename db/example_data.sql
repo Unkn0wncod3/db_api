@@ -329,9 +329,10 @@ SET data_json = jsonb_set(
     TRUE
 )
 FROM entries org_entry
-JOIN schemas person_schema ON person_schema.id = person_entry.schema_id
-JOIN schemas org_schema ON org_schema.id = org_entry.schema_id
+JOIN schemas org_schema ON org_schema.id = org_entry.schema_id,
+schemas person_schema
 WHERE person_schema.key = 'person'
+  AND person_schema.id = person_entry.schema_id
   AND org_schema.key = 'organization'
   AND person_entry.title IN ('Ada Lovelace', 'Grace Hopper')
   AND org_entry.title = 'Acme Logistics GmbH';
@@ -344,9 +345,10 @@ SET data_json = jsonb_set(
     TRUE
 )
 FROM entries person_entry
-JOIN schemas vehicle_schema ON vehicle_schema.id = vehicle_entry.schema_id
-JOIN schemas person_schema ON person_schema.id = person_entry.schema_id
+JOIN schemas person_schema ON person_schema.id = person_entry.schema_id,
+schemas vehicle_schema
 WHERE vehicle_schema.key = 'vehicle'
+  AND vehicle_schema.id = vehicle_entry.schema_id
   AND person_schema.key = 'person'
   AND (
       (vehicle_entry.title = 'Mercedes Sprinter KA-LX-204' AND person_entry.title = 'Grace Hopper')
@@ -362,9 +364,10 @@ SET data_json = jsonb_set(
     TRUE
 )
 FROM entries case_entry
-JOIN schemas todo_schema ON todo_schema.id = todo_entry.schema_id
-JOIN schemas case_schema ON case_schema.id = case_entry.schema_id
+JOIN schemas case_schema ON case_schema.id = case_entry.schema_id,
+schemas todo_schema
 WHERE todo_schema.key = 'todo'
+  AND todo_schema.id = todo_entry.schema_id
   AND case_schema.key = 'case_file'
   AND (
       (todo_entry.title = 'Task Review Acme KYC' AND case_entry.title = 'Case CF-2026-001')
@@ -382,8 +385,10 @@ SET data_json = jsonb_set(
     TRUE
 )
 FROM users assignee
-JOIN schemas todo_schema ON todo_schema.id = todo_entry.schema_id
+,
+schemas todo_schema
 WHERE todo_schema.key = 'todo'
+  AND todo_schema.id = todo_entry.schema_id
   AND (
       (todo_entry.title = 'Task Review Acme KYC' AND assignee.username = 'seed_editor')
       OR
@@ -401,7 +406,6 @@ INSERT INTO attachments (entry_id, file_name, stored_path, mime_type, file_size,
 SELECT e.id, a.file_name, a.stored_path, a.mime_type, a.file_size, a.checksum, u.id, a.description
 FROM entries e
 JOIN schemas s ON s.id = e.schema_id
-JOIN users u ON u.username = a.uploaded_by_username
 JOIN (
     VALUES
     (
@@ -446,6 +450,7 @@ JOIN (
     )
 ) AS a(entry_title, file_name, stored_path, mime_type, file_size, checksum, uploaded_by_username, description)
     ON a.entry_title = e.title
+JOIN users u ON u.username = a.uploaded_by_username
 WHERE s.key IN ('case_file', 'person');
 
 UPDATE entries case_entry
@@ -497,10 +502,6 @@ SELECT
     p.permission::entry_permission_enum,
     creator.id
 FROM entries e
-JOIN users creator ON creator.username = p.created_by_username
-LEFT JOIN users target_user
-    ON p.subject_type = 'user'
-   AND target_user.username = p.subject_id
 JOIN (
     VALUES
     ('Case CF-2026-001', 'role', 'manager', 'manage', 'seed_head_admin'),
@@ -514,7 +515,11 @@ JOIN (
     ('Ada Lovelace', 'role', 'editor', 'manage_attachments', 'seed_manager'),
     ('Mercedes Sprinter KA-LX-204', 'group', 'fleet_ops', 'manage_relations', 'seed_admin')
 ) AS p(entry_title, subject_type, subject_id, permission, created_by_username)
-    ON e.title = p.entry_title;
+    ON e.title = p.entry_title
+JOIN users creator ON creator.username = p.created_by_username
+LEFT JOIN users target_user
+    ON p.subject_type = 'user'
+   AND target_user.username = p.subject_id;
 
 
 -- ============================================================
@@ -536,7 +541,6 @@ SELECT
     h.changed_at,
     h.comment
 FROM entries e
-JOIN users u ON u.username = h.changed_by_username
 JOIN (
     VALUES
     (
@@ -598,6 +602,7 @@ JOIN (
     entry_title, changed_by_username, change_type, old_data_json, new_data_json,
     old_visibility_level, new_visibility_level, changed_at, comment
 )
-    ON e.title = h.entry_title;
+    ON e.title = h.entry_title
+JOIN users u ON u.username = h.changed_by_username;
 
 COMMIT;
