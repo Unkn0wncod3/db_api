@@ -13,6 +13,7 @@ from ..schemas import (
     EntryCreate,
     EntryBundleResponse,
     EntryHistoryRecord,
+    EntryLookupResponse,
     EntryPermissionCreate,
     EntryRelationCreate,
     EntryRelationResponse,
@@ -31,6 +32,16 @@ entry_service = EntryService()
 relation_service = RelationService()
 attachment_service = AttachmentService()
 permission_service = PermissionService()
+
+
+@router.get("/lookup", response_model=list[EntryLookupResponse])
+def list_entry_lookup(
+    q: Optional[str] = Query(default=None, max_length=255),
+    schema_id: Optional[int] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: Optional[Dict] = Depends(get_optional_current_user),
+):
+    return entry_service.list_entry_lookup(current_user=current_user, search=q, schema_id=schema_id, limit=limit)
 
 
 @router.get("", response_model=list[EntryResponse])

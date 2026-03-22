@@ -32,6 +32,44 @@ class EntryService:
         rows = self.entries.list_entries(schema_id=schema_id, owner_id=owner_id)
         return [row for row in rows if self.permissions.check_access(row, current_user, EntryPermission.READ)]
 
+    def list_entry_lookup(
+        self,
+        *,
+        current_user: Optional[Dict[str, Any]],
+        search: Optional[str] = None,
+        schema_id: Optional[int] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        schema_rows = self.schemas.list_schemas(include_inactive=True)
+        schema_map = {row["id"]: row for row in schema_rows}
+        visible_entries = self.list_entries(current_user=current_user, schema_id=schema_id)
+
+        normalized_search = (search or "").strip().lower()
+        if normalized_search:
+            visible_entries = [
+                row
+                for row in visible_entries
+                if normalized_search in row["title"].lower()
+                or normalized_search in (schema_map.get(row["schema_id"], {}).get("key") or "").lower()
+                or normalized_search in (schema_map.get(row["schema_id"], {}).get("name") or "").lower()
+            ]
+
+        result: List[Dict[str, Any]] = []
+        for entry in visible_entries[:limit]:
+            schema = schema_map.get(entry["schema_id"])
+            if not schema:
+                continue
+            result.append(
+                {
+                    "id": entry["id"],
+                    "title": entry["title"],
+                    "schema_id": schema["id"],
+                    "schema_key": schema["key"],
+                    "schema_name": schema["name"],
+                }
+            )
+        return result
+
     def get_entry(
         self,
         entry_id: int,

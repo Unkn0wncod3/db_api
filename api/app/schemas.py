@@ -235,6 +235,14 @@ class DashboardEntrySummary(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class EntryLookupResponse(BaseModel):
+    id: int
+    title: str
+    schema_id: int
+    schema_key: str
+    schema_name: str
+
+
 class DashboardSchemaTotal(BaseModel):
     schema_id: int
     schema_key: str
