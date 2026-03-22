@@ -131,6 +131,15 @@ def test_entry_bundle_endpoint_returns_detail_payload_in_one_response(client):
     assert len(payload["history"]) >= 1
     assert len(payload["relations"]) == 1
     assert payload["relations"][0]["to_entry_id"] == related_id
+    assert payload["relation_targets"] == [
+        {
+            "id": related_id,
+            "title": "Related Entry",
+            "schema_id": schema_id,
+            "schema_key": "entry_bundle_case",
+            "schema_name": "Entry Bundle Case",
+        }
+    ]
     assert len(payload["attachments"]) == 1
     assert payload["attachments"][0]["file_name"] == "briefing.pdf"
     assert len(payload["permissions"]) == 1

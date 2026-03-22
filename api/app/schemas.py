@@ -294,6 +294,7 @@ class EntryBundleResponse(BaseModel):
     access: Dict[str, bool] = Field(default_factory=dict)
     history: List[EntryHistoryRecord] = Field(default_factory=list)
     relations: List[EntryRelationResponse] = Field(default_factory=list)
+    relation_targets: List[EntryLookupResponse] = Field(default_factory=list)
     attachments: List[AttachmentResponse] = Field(default_factory=list)
     permissions: List[EntryPermissionResponse] = Field(default_factory=list)
 

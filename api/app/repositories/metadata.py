@@ -211,6 +211,28 @@ class EntryRepository:
             row["data_json"] = row.get("data_json") or {}
         return rows
 
+    def list_entry_lookup_by_ids(self, entry_ids: List[int]) -> List[Dict[str, Any]]:
+        if not entry_ids:
+            return []
+
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    e.id,
+                    e.title,
+                    s.id AS schema_id,
+                    s.key AS schema_key,
+                    s.name AS schema_name
+                FROM entries e
+                JOIN schemas s ON s.id = e.schema_id
+                WHERE e.id = ANY(%s)
+                ORDER BY e.title, e.id;
+                """,
+                (entry_ids,),
+            )
+            return cur.fetchall()
+
     def update_entry(self, entry_id: int, fields: Dict[str, Any]) -> Dict[str, Any]:
         payload = dict(fields)
         if "data_json" in payload:

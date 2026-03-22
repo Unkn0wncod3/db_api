@@ -89,12 +89,14 @@ class EntryService:
     ) -> Dict[str, Any]:
         entry = self.get_entry(entry_id, current_user=current_user, permission=EntryPermission.READ)
         access = self._build_access_map(entry, current_user)
+        relations = self.relations.list_relations(entry_id)
         return {
             "entry": entry,
             "schema": self._get_schema_with_fields(entry["schema_id"]),
             "access": access,
             "history": self.history.list_history(entry_id) if access[EntryPermission.VIEW_HISTORY.value] else [],
-            "relations": self.relations.list_relations(entry_id),
+            "relations": relations,
+            "relation_targets": self._list_relation_targets(entry_id, relations),
             "attachments": self.attachments.list_attachments(entry_id),
             "permissions": self.permissions.list_permissions(entry_id) if access[EntryPermission.MANAGE_PERMISSIONS.value] else [],
         }
@@ -219,3 +221,12 @@ class EntryService:
         schema = self.schemas.get_schema(schema_id)
         schema["fields"] = self.fields.list_fields(schema_id, include_inactive=True)
         return schema
+
+    def _list_relation_targets(self, entry_id: int, relations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        related_entry_ids = sorted(
+            {
+                relation["to_entry_id"] if relation["from_entry_id"] == entry_id else relation["from_entry_id"]
+                for relation in relations
+            }
+        )
+        return self.entries.list_entry_lookup_by_ids(related_entry_ids)
