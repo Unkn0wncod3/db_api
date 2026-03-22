@@ -91,5 +91,13 @@ Example:
 
 1. Install dependencies with `pip install -r requirements.txt`
 2. Initialize PostgreSQL with `db/init.sql`
-3. Start the API
+3. Start or restart the API with Docker:
+
+```bash
+cd /opt/db_api
+docker compose build api
+docker compose up -d api
+docker compose ps
+```
+
 4. Open `http://localhost:8000/docs`
