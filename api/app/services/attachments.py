@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from ..core.errors import NotFoundError, ValidationError
 from ..repositories.metadata import AttachmentRepository, EntryRepository
 
 
@@ -39,3 +40,25 @@ class AttachmentService:
                 "description": description,
             }
         )
+
+    def update_attachment_link(self, entry_id: int, attachment_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
+        self.entries.get_entry(entry_id)
+        attachment = self.attachments.get_attachment(attachment_id)
+        if attachment["entry_id"] != entry_id:
+            raise NotFoundError("Attachment not found for entry")
+
+        if not updates:
+            raise ValidationError([{"field": "_request", "message": "No fields to update"}])
+
+        payload = dict(updates)
+        if "external_url" in payload:
+            payload["stored_path"] = str(payload.pop("external_url"))
+            payload["checksum"] = payload.get("checksum") or payload["stored_path"]
+        return self.attachments.update_attachment(attachment_id, payload)
+
+    def delete_attachment(self, entry_id: int, attachment_id: int) -> Dict[str, Any]:
+        self.entries.get_entry(entry_id)
+        attachment = self.attachments.get_attachment(attachment_id)
+        if attachment["entry_id"] != entry_id:
+            raise NotFoundError("Attachment not found for entry")
+        return self.attachments.delete_attachment(attachment_id)

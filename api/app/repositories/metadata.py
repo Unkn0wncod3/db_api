@@ -478,6 +478,14 @@ class HistoryRepository:
 
 
 class PermissionRepository:
+    def get_permission(self, permission_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM entry_permissions WHERE id=%s;", (permission_id,))
+            row = cur.fetchone()
+        if not row:
+            raise NotFoundError("Permission not found")
+        return row
+
     def create_permission(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         with get_connection() as conn, conn.cursor() as cur:
             try:
@@ -501,8 +509,44 @@ class PermissionRepository:
             cur.execute("SELECT * FROM entry_permissions WHERE entry_id=%s ORDER BY id;", (entry_id,))
             return cur.fetchall()
 
+    def update_permission(self, permission_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(updates)
+        payload["permission_id"] = permission_id
+        assignments = ", ".join(f"{key}=%({key})s" for key in updates)
+        with get_connection() as conn, conn.cursor() as cur:
+            try:
+                cur.execute(
+                    f"UPDATE entry_permissions SET {assignments} WHERE id=%(permission_id)s RETURNING *;",
+                    payload,
+                )
+            except UniqueViolation:
+                conn.rollback()
+                raise ConflictError("Permission already exists")
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Permission not found")
+        return row
+
+    def delete_permission(self, permission_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM entry_permissions WHERE id=%s RETURNING *;", (permission_id,))
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Permission not found")
+        return row
+
 
 class AttachmentRepository:
+    def get_attachment(self, attachment_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT * FROM attachments WHERE id=%s;", (attachment_id,))
+            row = cur.fetchone()
+        if not row:
+            raise NotFoundError("Attachment not found")
+        return row
+
     def create_attachment(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         with get_connection() as conn, conn.cursor() as cur:
             try:
@@ -529,6 +573,34 @@ class AttachmentRepository:
         with get_connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM attachments WHERE entry_id=%s ORDER BY uploaded_at DESC, id DESC;", (entry_id,))
             return cur.fetchall()
+
+    def update_attachment(self, attachment_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(updates)
+        payload["attachment_id"] = attachment_id
+        assignments = ", ".join(f"{key}=%({key})s" for key in updates)
+        with get_connection() as conn, conn.cursor() as cur:
+            try:
+                cur.execute(
+                    f"UPDATE attachments SET {assignments} WHERE id=%(attachment_id)s RETURNING *;",
+                    payload,
+                )
+            except UniqueViolation:
+                conn.rollback()
+                raise ConflictError("Attachment checksum already exists for entry")
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Attachment not found")
+        return row
+
+    def delete_attachment(self, attachment_id: int) -> Dict[str, Any]:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM attachments WHERE id=%s RETURNING *;", (attachment_id,))
+            row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise NotFoundError("Attachment not found")
+        return row
 
 
 def ensure_unique_field_value(schema_id: int, field_key: str, value: Any, *, exclude_entry_id: Optional[int] = None) -> None:

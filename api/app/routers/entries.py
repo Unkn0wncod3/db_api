@@ -9,12 +9,15 @@ from ..roles import ENTRY_WRITE_ROLES, READ_ROLES
 from ..schemas import (
     AccessCheckResponse,
     AttachmentLinkCreate,
+    AttachmentLinkUpdate,
     AttachmentResponse,
     EntryCreate,
     EntryBundleResponse,
     EntryHistoryRecord,
     EntryLookupResponse,
     EntryPermissionCreate,
+    EntryPermissionResponse,
+    EntryPermissionUpdate,
     EntryRelationCreate,
     EntryRelationResponse,
     EntryRelationUpdate,
@@ -113,14 +116,14 @@ def delete_relation(
     return relation_service.delete_relation(entry_id, relation_id)
 
 
-@router.get("/{entry_id}/permissions")
+@router.get("/{entry_id}/permissions", response_model=list[EntryPermissionResponse])
 def list_permissions(entry_id: int, current_user: Dict = Depends(require_role(*READ_ROLES))):
     entry = entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_PERMISSIONS)
     permission_service.require_access(entry, current_user, EntryPermission.MANAGE_PERMISSIONS)
     return permission_service.list_permissions(entry_id)
 
 
-@router.post("/{entry_id}/permissions", status_code=201)
+@router.post("/{entry_id}/permissions", response_model=EntryPermissionResponse, status_code=201)
 def create_permission(entry_id: int, payload: EntryPermissionCreate, current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES))):
     entry = entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_PERMISSIONS)
     permission_service.require_access(entry, current_user, EntryPermission.MANAGE_PERMISSIONS)
@@ -128,6 +131,29 @@ def create_permission(entry_id: int, payload: EntryPermissionCreate, current_use
     data["entry_id"] = entry_id
     data["created_by"] = current_user["id"]
     return permission_service.create_permission(data)
+
+
+@router.patch("/{entry_id}/permissions/{permission_id}", response_model=EntryPermissionResponse)
+def update_permission(
+    entry_id: int,
+    permission_id: int,
+    payload: EntryPermissionUpdate,
+    current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES)),
+):
+    entry = entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_PERMISSIONS)
+    permission_service.require_access(entry, current_user, EntryPermission.MANAGE_PERMISSIONS)
+    return permission_service.update_permission(entry_id, permission_id, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/{entry_id}/permissions/{permission_id}", response_model=EntryPermissionResponse)
+def delete_permission(
+    entry_id: int,
+    permission_id: int,
+    current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES)),
+):
+    entry = entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_PERMISSIONS)
+    permission_service.require_access(entry, current_user, EntryPermission.MANAGE_PERMISSIONS)
+    return permission_service.delete_permission(entry_id, permission_id)
 
 
 @router.get("/{entry_id}/attachments", response_model=list[AttachmentResponse])
@@ -153,6 +179,27 @@ def create_attachment_link(
         uploaded_by=current_user["id"],
         description=payload.description,
     )
+
+
+@router.patch("/{entry_id}/attachments/{attachment_id}", response_model=AttachmentResponse)
+def update_attachment_link(
+    entry_id: int,
+    attachment_id: int,
+    payload: AttachmentLinkUpdate,
+    current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES)),
+):
+    entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_ATTACHMENTS)
+    return attachment_service.update_attachment_link(entry_id, attachment_id, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/{entry_id}/attachments/{attachment_id}", response_model=AttachmentResponse)
+def delete_attachment(
+    entry_id: int,
+    attachment_id: int,
+    current_user: Dict = Depends(require_role(*ENTRY_WRITE_ROLES)),
+):
+    entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.MANAGE_ATTACHMENTS)
+    return attachment_service.delete_attachment(entry_id, attachment_id)
 
 
 @router.get("/{entry_id}/access/{permission}", response_model=AccessCheckResponse)

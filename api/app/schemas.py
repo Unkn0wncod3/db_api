@@ -199,10 +199,25 @@ class AttachmentLinkCreate(BaseModel):
     description: Optional[str] = None
 
 
+class AttachmentLinkUpdate(BaseModel):
+    file_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    external_url: Optional[HttpUrl] = None
+    mime_type: Optional[str] = Field(default=None, max_length=255)
+    file_size: Optional[int] = Field(default=None, ge=0)
+    checksum: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+
+
 class EntryPermissionCreate(BaseModel):
     subject_type: PermissionSubjectType
     subject_id: str
     permission: EntryPermission
+
+
+class EntryPermissionUpdate(BaseModel):
+    subject_type: Optional[PermissionSubjectType] = None
+    subject_id: Optional[str] = None
+    permission: Optional[EntryPermission] = None
 
 
 class AccessCheckResponse(BaseModel):
