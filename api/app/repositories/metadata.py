@@ -386,8 +386,6 @@ class HistoryRepository:
                 grant_subjects = ["(ep.subject_type = 'user' AND ep.subject_id = %(user_id_text)s)"]
                 if role is not None:
                     grant_subjects.append("(ep.subject_type = 'role' AND ep.subject_id = %(role)s)")
-                if group_ids:
-                    grant_subjects.append("(ep.subject_type = 'group' AND ep.subject_id = ANY(%(group_ids)s))")
                 clauses.append(
                     f"""(
                         e.owner_id = %(user_id)s

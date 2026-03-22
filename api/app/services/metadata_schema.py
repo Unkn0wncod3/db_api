@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from ..core.enums import EntryPermission
 from ..core.errors import ValidationError
 from ..repositories.metadata import EntryRepository, FieldRepository, SchemaRepository
+from .access import EntryAccessService
 from .permissions import PermissionService
 
 
@@ -14,6 +15,7 @@ class MetadataSchemaService:
         self.fields = FieldRepository()
         self.entries = EntryRepository()
         self.permissions = PermissionService()
+        self.access = EntryAccessService()
 
     def list_schemas(self, *, include_inactive: bool = False) -> List[Dict[str, Any]]:
         return self.schemas.list_schemas(include_inactive=include_inactive)
@@ -31,10 +33,7 @@ class MetadataSchemaService:
             if not self.permissions.check_access(row, current_user, EntryPermission.READ):
                 continue
             entry = dict(row)
-            entry["access"] = {
-                permission.value: self.permissions.check_access(row, current_user, permission)
-                for permission in EntryPermission
-            }
+            entry["access"] = self.access.get_access_map(row, current_user)
             visible_entries.append(entry)
         return {
             "schema": schema,

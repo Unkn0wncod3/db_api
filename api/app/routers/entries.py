@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from fastapi import APIRouter, Depends, Query
 
 from ..core.enums import EntryPermission
+from ..core.errors import ForbiddenError
 from ..roles import ENTRY_WRITE_ROLES, READ_ROLES
 from ..schemas import (
     AccessCheckResponse,
@@ -204,9 +205,12 @@ def delete_attachment(
 
 @router.get("/{entry_id}/access/{permission}", response_model=AccessCheckResponse)
 def check_access(entry_id: int, permission: EntryPermission, current_user: Dict = Depends(get_current_user)):
-    entry = entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.READ)
+    entry = entry_service.entries.get_entry(entry_id)
+    access = permission_service.get_access_map(entry, current_user)
+    if not access[EntryPermission.READ.value]:
+        raise ForbiddenError("Access denied for requested entry")
     return AccessCheckResponse(
         entry_id=entry_id,
         permission=permission,
-        allowed=permission_service.check_access(entry, current_user, permission),
+        allowed=access[permission.value],
     )

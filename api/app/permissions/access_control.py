@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from ..core.enums import EntryPermission, PermissionSubjectType, VisibilityLevel
 from ..core.errors import ForbiddenError
@@ -35,15 +35,29 @@ class AccessControlService:
         )
 
     def can_access(self, entry: Dict[str, Any], user: Optional[Dict[str, Any]], permission: EntryPermission) -> bool:
+        return permission in self.get_effective_permissions(entry, user)
+
+    def get_access_map(self, entry: Dict[str, Any], user: Optional[Dict[str, Any]]) -> Dict[str, bool]:
+        effective_permissions = self.get_effective_permissions(entry, user)
+        return {
+            permission.value: permission in effective_permissions
+            for permission in EntryPermission
+        }
+
+    def get_effective_permissions(self, entry: Dict[str, Any], user: Optional[Dict[str, Any]]) -> Set[EntryPermission]:
         context = self.build_context(user)
         if context.role in ADMIN_ROLE_SET:
-            return True
-        if permission == EntryPermission.READ and self._is_visible(entry, context):
-            return True
+            return set(EntryPermission)
+
+        effective_permissions: Set[EntryPermission] = set()
+        if self._is_visible(entry, context):
+            effective_permissions.add(EntryPermission.READ)
         if context.user_id is not None and entry.get("owner_id") == context.user_id:
-            return True
+            return set(EntryPermission)
+
         grants = self.permission_repository.list_permissions(entry["id"])
-        return self._has_matching_grant(grants, context, permission)
+        effective_permissions.update(self._collect_matching_grants(grants, context))
+        return effective_permissions
 
     def require_access(self, entry: Dict[str, Any], user: Optional[Dict[str, Any]], permission: EntryPermission) -> None:
         if not self.can_access(entry, user, permission):
@@ -57,19 +71,18 @@ class AccessControlService:
             return context.user_id is not None
         return False
 
-    def _has_matching_grant(
+    def _collect_matching_grants(
         self,
         grants: List[Dict[str, Any]],
         context: EntryAccessContext,
-        requested_permission: EntryPermission,
-    ) -> bool:
+    ) -> Set[EntryPermission]:
+        effective_permissions: Set[EntryPermission] = set()
         for grant in grants:
             if not self._subject_matches(grant, context):
                 continue
             granted_permission = EntryPermission(grant["permission"])
-            if requested_permission in _PERMISSION_IMPLICATIONS[granted_permission]:
-                return True
-        return False
+            effective_permissions.update(_PERMISSION_IMPLICATIONS[granted_permission])
+        return effective_permissions
 
     def _subject_matches(self, grant: Dict[str, Any], context: EntryAccessContext) -> bool:
         subject_type = PermissionSubjectType(grant["subject_type"])
@@ -79,5 +92,5 @@ class AccessControlService:
         if subject_type == PermissionSubjectType.ROLE:
             return context.role is not None and context.role == subject_id
         if subject_type == PermissionSubjectType.GROUP:
-            return subject_id in context.group_ids
+            return False
         return False

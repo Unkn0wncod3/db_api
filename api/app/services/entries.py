@@ -7,6 +7,7 @@ from ..core.errors import ValidationError
 from ..repositories.metadata import EntryRepository, FieldRepository, SchemaRepository, ensure_unique_field_value
 from ..validation.entries import validate_entry_payload
 from .attachments import AttachmentService
+from .access import EntryAccessService
 from .entry_history import EntryHistoryService
 from .permissions import PermissionService
 from .relations import RelationService
@@ -19,6 +20,7 @@ class EntryService:
         self.entries = EntryRepository()
         self.history = EntryHistoryService()
         self.permissions = PermissionService()
+        self.access = EntryAccessService()
         self.relations = RelationService()
         self.attachments = AttachmentService()
 
@@ -212,10 +214,7 @@ class EntryService:
             ensure_unique_field_value(schema_id, field_key, data_json[field_key], exclude_entry_id=exclude_entry_id)
 
     def _build_access_map(self, entry: Dict[str, Any], current_user: Optional[Dict[str, Any]]) -> Dict[str, bool]:
-        return {
-            permission.value: self.permissions.check_access(entry, current_user, permission)
-            for permission in EntryPermission
-        }
+        return self.access.get_access_map(entry, current_user)
 
     def _get_schema_with_fields(self, schema_id: int) -> Dict[str, Any]:
         schema = self.schemas.get_schema(schema_id)
