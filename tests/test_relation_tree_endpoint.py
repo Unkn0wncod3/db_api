@@ -39,6 +39,21 @@ def _create_entry(client, schema_id: int, title: str) -> int:
     return response.json()["id"]
 
 
+def _create_schema(client, key: str, name: str) -> int:
+    response = client.post(
+        "/schemas",
+        json={
+            "key": key,
+            "name": name,
+            "description": f"Schema for {name}",
+            "icon": "git-branch",
+            "is_active": True,
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 def _create_relation(client, from_entry_id: int, to_entry_id: int, sort_order: int) -> None:
     response = client.post(
         f"/entries/{from_entry_id}/relations",
@@ -56,24 +71,14 @@ def test_relation_tree_endpoint_handles_cycles_without_duplicate_expansion(clien
     _ensure_test_actor()
     auth_headers = _auth_headers()
 
-    schema_resp = client.post(
-        "/schemas",
-        json={
-            "key": "relation_tree_case",
-            "name": "Relation Tree Case",
-            "description": "Schema for relation tree test",
-            "icon": "git-branch",
-            "is_active": True,
-        },
-    )
-    assert schema_resp.status_code == 201
-    schema_id = schema_resp.json()["id"]
+    schema_id = _create_schema(client, "relation_tree_case", "Relation Tree Case")
+    related_schema_id = _create_schema(client, "relation_tree_related", "Relation Tree Related")
 
     root_id = _create_entry(client, schema_id, "Root")
     x_id = _create_entry(client, schema_id, "X")
     y_id = _create_entry(client, schema_id, "Y")
     f_id = _create_entry(client, schema_id, "F")
-    g_id = _create_entry(client, schema_id, "G")
+    g_id = _create_entry(client, related_schema_id, "G")
 
     _create_relation(client, root_id, x_id, 1)
     _create_relation(client, x_id, y_id, 1)
@@ -87,6 +92,9 @@ def test_relation_tree_endpoint_handles_cycles_without_duplicate_expansion(clien
     payload = response.json()
     assert payload["root_entry_id"] == root_id
     assert payload["tree"]["entry"]["id"] == root_id
+    assert payload["tree"]["entry"]["schema_id"] == schema_id
+    assert payload["tree"]["entry"]["schema"]["id"] == schema_id
+    assert payload["tree"]["entry"]["schema"]["name"] == "Relation Tree Case"
 
     root_children = payload["tree"]["children"]
     assert [child["entry"]["id"] for child in root_children] == [x_id]
@@ -113,6 +121,10 @@ def test_relation_tree_endpoint_handles_cycles_without_duplicate_expansion(clien
     g_node = nested_y_children[1]
     assert f_node["is_reference"] is False
     assert g_node["is_reference"] is False
+    assert g_node["entry"]["schema_id"] == related_schema_id
+    assert g_node["entry"]["schema"]["id"] == related_schema_id
+    assert g_node["entry"]["schema"]["key"] == "relation_tree_related"
+    assert g_node["entry"]["schema"]["name"] == "Relation Tree Related"
 
     cycle_children = g_node["children"]
     assert [child["entry"]["id"] for child in cycle_children] == [x_id]

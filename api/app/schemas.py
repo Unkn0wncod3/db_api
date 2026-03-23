@@ -173,9 +173,19 @@ class EntryRelationTreeLink(BaseModel):
     direction: Literal["outgoing", "incoming"]
 
 
+class EntryRelationTreeSchema(BaseModel):
+    id: int
+    key: str
+    name: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    is_active: bool
+
+
 class EntryRelationTreeEntry(BaseModel):
     id: int
     schema_id: int
+    schema: EntryRelationTreeSchema
     title: str
     status: str
     visibility_level: VisibilityLevel
