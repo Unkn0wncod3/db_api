@@ -21,6 +21,7 @@ from ..schemas import (
     EntryPermissionUpdate,
     EntryRelationCreate,
     EntryRelationResponse,
+    EntryRelationTreeResponse,
     EntryRelationUpdate,
     EntryResponse,
     EntryUpdate,
@@ -86,6 +87,12 @@ def get_history(entry_id: int, current_user: Optional[Dict] = Depends(get_option
 def list_relations(entry_id: int, current_user: Optional[Dict] = Depends(get_optional_current_user)):
     entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.READ)
     return relation_service.list_relations(entry_id)
+
+
+@router.get("/{entry_id}/relation-tree", response_model=EntryRelationTreeResponse)
+def get_relation_tree(entry_id: int, current_user: Optional[Dict] = Depends(get_optional_current_user)):
+    entry_service.get_entry(entry_id, current_user=current_user, permission=EntryPermission.READ)
+    return relation_service.get_relation_tree(entry_id, current_user=current_user)
 
 
 @router.post("/{entry_id}/relations", response_model=EntryRelationResponse, status_code=201)

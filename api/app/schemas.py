@@ -163,6 +163,38 @@ class EntryRelationResponse(BaseModel):
     created_at: datetime
 
 
+class EntryRelationTreeLink(BaseModel):
+    relation_id: int
+    from_entry_id: int
+    to_entry_id: int
+    relation_type: EntryRelationType
+    sort_order: int
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
+    direction: Literal["outgoing", "incoming"]
+
+
+class EntryRelationTreeEntry(BaseModel):
+    id: int
+    schema_id: int
+    title: str
+    status: str
+    visibility_level: VisibilityLevel
+    owner_id: Optional[int] = None
+
+
+class EntryRelationTreeNode(BaseModel):
+    entry: EntryRelationTreeEntry
+    via_relation: Optional[EntryRelationTreeLink] = None
+    children: List["EntryRelationTreeNode"] = Field(default_factory=list)
+    is_reference: bool = False
+    reference_reason: Optional[Literal["cycle", "duplicate"]] = None
+
+
+class EntryRelationTreeResponse(BaseModel):
+    root_entry_id: int
+    tree: EntryRelationTreeNode
+
+
 class AttachmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -356,6 +388,9 @@ class UserListResponse(BaseModel):
     items: List[UserResponse]
     limit: int
     offset: int
+
+
+EntryRelationTreeNode.model_rebuild()
 
 
 class AuthLoginRequest(BaseModel):
