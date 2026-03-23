@@ -389,12 +389,15 @@ class HistoryRepository:
                 clauses.append(
                     f"""(
                         e.owner_id = %(user_id)s
-                        OR EXISTS (
-                            SELECT 1
-                            FROM entry_permissions ep
-                            WHERE ep.entry_id = e.id
-                              AND ep.permission IN ('view_history', 'manage')
-                              AND ({' OR '.join(grant_subjects)})
+                        OR (
+                            e.visibility_level != 'private'
+                            AND EXISTS (
+                                SELECT 1
+                                FROM entry_permissions ep
+                                WHERE ep.entry_id = e.id
+                                  AND ep.permission IN ('view_history', 'manage')
+                                  AND ({' OR '.join(grant_subjects)})
+                            )
                         )
                     )"""
                 )

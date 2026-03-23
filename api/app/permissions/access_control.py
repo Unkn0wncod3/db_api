@@ -6,7 +6,7 @@ from ..core.enums import EntryPermission, PermissionSubjectType, VisibilityLevel
 from ..core.errors import ForbiddenError
 from ..models.metadata import EntryAccessContext
 from ..repositories.metadata import PermissionRepository
-from ..roles import ADMIN_ROLE_SET
+from ..roles import ROLE_HEAD_ADMIN
 
 _PERMISSION_IMPLICATIONS = {
     EntryPermission.READ: {EntryPermission.READ},
@@ -46,14 +46,16 @@ class AccessControlService:
 
     def get_effective_permissions(self, entry: Dict[str, Any], user: Optional[Dict[str, Any]]) -> Set[EntryPermission]:
         context = self.build_context(user)
-        if context.role in ADMIN_ROLE_SET:
+        if context.role == ROLE_HEAD_ADMIN:
             return set(EntryPermission)
 
         effective_permissions: Set[EntryPermission] = set()
-        if self._is_visible(entry, context):
-            effective_permissions.add(EntryPermission.READ)
         if context.user_id is not None and entry.get("owner_id") == context.user_id:
             return set(EntryPermission)
+        if VisibilityLevel(entry["visibility_level"]) == VisibilityLevel.PRIVATE:
+            return effective_permissions
+        if self._is_visible(entry, context):
+            effective_permissions.add(EntryPermission.READ)
 
         grants = self.permission_repository.list_permissions(entry["id"])
         effective_permissions.update(self._collect_matching_grants(grants, context))

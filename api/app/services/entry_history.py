@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from ..core.enums import EntryChangeType
-from ..roles import ADMIN_ROLE_SET
+from ..roles import ROLE_HEAD_ADMIN
 from ..repositories.metadata import HistoryRepository
 
 
@@ -38,7 +38,7 @@ class EntryHistoryService:
             change_type=change_type,
             date_from=date_from,
             date_to=date_to,
-            is_admin=(current_user or {}).get("role") in ADMIN_ROLE_SET,
+            is_admin=(current_user or {}).get("role") == ROLE_HEAD_ADMIN,
             user_id=(current_user or {}).get("id"),
             role=(current_user or {}).get("role"),
             group_ids=[str(group_id) for group_id in (current_user or {}).get("group_ids", [])],
